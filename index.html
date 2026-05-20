@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q2D — Dependency Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #333; }
+
+    header {
+      background: #1a2a3a;
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.2rem; letter-spacing: 0.5px; }
+    header .subtitle { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+
+    .toolbar {
+      background: white;
+      padding: 12px 24px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn { padding: 7px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+    .btn-add    { background: #27ae60; color: white; font-weight: bold; }
+    .btn-dark   { background: #1a2a3a; color: white; }
+    .btn-import { background: #7f8c8d; color: white; cursor: pointer; }
+    .btn-edit   { background: #2980b9; color: white; padding: 4px 10px; font-size: 0.78rem; }
+    .btn-del    { background: #c0392b; color: white; padding: 4px 10px; font-size: 0.78rem; }
+    .btn:hover  { opacity: 0.88; }
+
+    .sep { width: 1px; height: 28px; background: #ddd; margin: 0 4px; }
+    .filter-label { font-size: 0.82rem; color: #666; font-weight: bold; }
+    select, input[type="text"] {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-family: inherit;
+    }
+
+    /* View tabs */
+    .view-tabs {
+      background: #f7f7f7;
+      border-bottom: 1px solid #ddd;
+      padding: 0 24px;
+      display: flex;
+      gap: 0;
+    }
+    .view-tab {
+      padding: 10px 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      color: #666;
+      user-select: none;
+    }
+    .view-tab:hover { color: #333; }
+    .view-tab.active { color: #1a2a3a; border-bottom-color: #1a2a3a; font-weight: bold; }
+
+    .container { padding: 20px 24px; }
+
+    /* Stats */
+    .stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat { background: white; border-radius: 6px; padding: 10px 18px; border-left: 4px solid #ccc; min-width: 110px; }
+    .stat .count { font-size: 1.6rem; font-weight: bold; line-height: 1; }
+    .stat .label { font-size: 0.75rem; color: #666; margin-top: 3px; }
+    .stat.s-open     { border-color: #e74c3c; } .stat.s-open .count     { color: #e74c3c; }
+    .stat.s-progress { border-color: #e67e22; } .stat.s-progress .count { color: #e67e22; }
+    .stat.s-review   { border-color: #2980b9; } .stat.s-review .count   { color: #2980b9; }
+    .stat.s-resolved { border-color: #27ae60; } .stat.s-resolved .count { color: #27ae60; }
+    .stat.s-total    { border-color: #95a5a6; } .stat.s-total .count    { color: #555; }
+
+    /* Phase summary cards */
+    .phase-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .phase-card {
+      background: white;
+      border-radius: 6px;
+      padding: 12px 16px;
+      border-top: 4px solid #2980b9;
+      min-width: 160px;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .phase-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .phase-card.active { box-shadow: 0 0 0 2px #2980b9; }
+    .phase-card .ph-name { font-size: 0.9rem; font-weight: bold; color: #1a2a3a; margin-bottom: 6px; }
+    .phase-card .ph-stats { font-size: 0.75rem; color: #666; display: flex; gap: 10px; flex-wrap: wrap; }
+    .ph-open { color: #e74c3c; font-weight: bold; }
+    .ph-done { color: #27ae60; font-weight: bold; }
+
+    /* Team view */
+    .team-section { margin-bottom: 24px; }
+    .team-heading {
+      background: #1a2a3a;
+      color: white;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border-radius: 4px 4px 0 0;
+    }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; border-radius: 0 0 6px 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .table-wrap-standalone { border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; background: white; min-width: 860px; }
+    th {
+      background: #253545;
+      color: white;
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 0.79rem;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { background: #2d4055; }
+    th.sort-asc::after  { content: ' ▲'; font-size: 0.65rem; }
+    th.sort-desc::after { content: ' ▼'; font-size: 0.65rem; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.83rem; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    tr.resolved-row td { opacity: 0.55; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 0.73rem;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .badge-open       { background: #fde8e8; color: #c0392b; }
+    .badge-inprogress { background: #fef3cd; color: #b7770d; }
+    .badge-inreview   { background: #d6eaf8; color: #1a6fa0; }
+    .badge-resolved   { background: #d5f5e3; color: #1a7a40; }
+
+    .phase-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      background: #e8eaf6;
+      color: #3949ab;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .p-low      { color: #27ae60; font-weight: bold; font-size: 0.8rem; }
+    .p-medium   { color: #e67e22; font-weight: bold; font-size: 0.8rem; }
+    .p-high     { color: #d35400; font-weight: bold; font-size: 0.8rem; }
+    .p-critical { color: #c0392b; font-weight: bold; font-size: 0.8rem; }
+
+    .overdue { color: #c0392b; font-weight: bold; }
+    .notes-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: #aaa; background: white; border-radius: 6px; }
+    .empty-state p { margin-top: 8px; font-size: 0.9rem; }
+
+    /* Modal */
+    .overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.45);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      width: 640px;
+      max-width: 96vw;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+    .modal h2 { font-size: 1.05rem; margin-bottom: 18px; color: #1a2a3a; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fg { display: flex; flex-direction: column; gap: 5px; }
+    .fg.full { grid-column: 1 / -1; }
+    .fg label { font-size: 0.78rem; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.4px; }
+    .fg input, .fg select, .fg textarea {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+    .fg textarea { resize: vertical; min-height: 70px; }
+    .fg input:focus, .fg select:focus, .fg textarea:focus {
+      outline: none;
+      border-color: #2980b9;
+      box-shadow: 0 0 0 2px rgba(41,128,185,0.15);
+    }
+
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .btn-cancel { background: #ecf0f1; color: #555; }
+    .required { color: #e74c3c; }
+    .last-updated { font-size: 0.75rem; color: #aaa; margin-top: 14px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Q2D &mdash; Dependency Manager</h1>
+    <div class="subtitle">Track cross-team task dependencies across all phases</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn btn-dark" onclick="exportJSON()">Export JSON</button>
+    <label class="btn btn-import">Import JSON
+      <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
+    </label>
+  </div>
+</header>
+
+<!-- View tabs -->
+<div class="view-tabs">
+  <div class="view-tab active" id="tab-all"    onclick="switchView('all')">All Dependencies</div>
+  <div class="view-tab"        id="tab-phase"  onclick="switchView('phase')">By Phase</div>
+  <div class="view-tab"        id="tab-team"   onclick="switchView('team')">By Team</div>
+</div>
+
+<!-- Filters toolbar -->
+<div class="toolbar">
+  <button class="btn btn-add" onclick="openModal()">+ Add Dependency</button>
+  <div class="sep"></div>
+  <span class="filter-label">Filter:</span>
+  <select id="fPhase" onchange="render()">
+    <option value="">All Phases</option>
+    <option value="Q2D - P1: Quarry Raw Material Management">P1: Quarry Raw Material Management</option>
+    <option value="Q2D - P2: Quality KPI Monitoring">P2: Quality KPI Monitoring</option>
+    <option value="Q2D - P3: Clinker KPI Monitoring & Team Optimization">P3: Clinker KPI Monitoring & Team Optimization</option>
+    <option value="Q2D - P4: Additives Management">P4: Additives Management</option>
+    <option value="Q2D - P5: Packaging Performance Monitoring">P5: Packaging Performance Monitoring</option>
+    <option value="Q2D - P6: Clinker Emissions & Environmental Performance monitoring">P6: Clinker Emissions & Environmental Performance monitoring</option>
+  </select>
+  <select id="fStatus" onchange="render()">
+    <option value="">All Statuses</option>
+    <option value="Open">Open</option>
+    <option value="In Progress">In Progress</option>
+    <option value="In Review">In Review</option>
+    <option value="Resolved">Resolved</option>
+  </select>
+  <select id="fPriority" onchange="render()">
+    <option value="">All Priorities</option>
+    <option value="Critical">Critical</option>
+    <option value="High">High</option>
+    <option value="Medium">Medium</option>
+    <option value="Low">Low</option>
+  </select>
+  <input type="text" id="fSearch" placeholder="Search tasks, teams..." oninput="render()" style="width:190px;">
+  <label style="font-size:0.82rem;color:#666;cursor:pointer;">
+    <input type="checkbox" id="fHideResolved" onchange="render()"> Hide resolved
+  </label>
+</div>
+
+<div class="container" id="mainContainer"></div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <h2 id="modalTitle">Add Dependency</h2>
+    <div class="form-grid">
+      <div class="fg full">
+        <label>Phase <span class="required">*</span></label>
+        <select id="f_phase">
+          <option value="Q2D - P1: Quarry Raw Material Management">P1: Quarry Raw Material Management</option>
+          <option value="Q2D - P2: Quality KPI Monitoring">P2: Quality KPI Monitoring</option>
+          <option value="Q2D - P3: Clinker KPI Monitoring & Team Optimization">P3: Clinker KPI Monitoring & Team Optimization</option>
+          <option value="Q2D - P4: Additives Management">P4: Additives Management</option>
+          <option value="Q2D - P5: Packaging Performance Monitoring">P5: Packaging Performance Monitoring</option>
+          <option value="Q2D - P6: Clinker Emissions & Environmental Performance monitoring">P6: Clinker Emissions & Environmental Performance monitoring</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Blocked Task <span class="required">*</span></label>
+        <input id="f_blocked_task" placeholder="Task that is waiting...">
+      </div>
+      <div class="fg">
+        <label>Blocked Team / Dept <span class="required">*</span></label>
+        <input id="f_blocked_team" placeholder="e.g. Engineering">
+      </div>
+      <div class="fg">
+        <label>Blocking Task <span class="required">*</span></label>
+        <input id="f_blocking_task" placeholder="Task that must happen first...">
+      </div>
+      <div class="fg">
+        <label>Blocking Team / Dept <span class="required">*</span></label>
+        <input id="f_blocking_team" placeholder="e.g. Operations">
+      </div>
+      <div class="fg">
+        <label>Priority / Criticality</label>
+        <select id="f_priority">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Status</label>
+        <select id="f_status">
+          <option value="Open" selected>Open</option>
+          <option value="In Progress">In Progress</option>
+          <option value="In Review">In Review</option>
+          <option value="Resolved">Resolved</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Due Date</label>
+        <input type="date" id="f_due_date">
+      </div>
+      <div class="fg full">
+        <label>Notes</label>
+        <textarea id="f_notes" placeholder="Context, links, decisions..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-dark" onclick="save()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let deps = [];
+let editId = null;
+let sortCol = 'priority';
+let sortDir = 1;
+let currentView = 'all';
+
+const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+const STATUS_ORDER   = { Open: 0, 'In Progress': 1, 'In Review': 2, Resolved: 3 };
+const PHASES = [
+  'Q2D - P1: Quarry Raw Material Management',
+  'Q2D - P2: Quality KPI Monitoring',
+  'Q2D - P3: Clinker KPI Monitoring & Team Optimization',
+  'Q2D - P4: Additives Management',
+  'Q2D - P5: Packaging Performance Monitoring',
+  'Q2D - P6: Clinker Emissions & Environmental Performance monitoring',
+];
+
+async function init() {
+  try {
+    const r = await fetch('dependencies.json?t=' + Date.now());
+    if (r.ok) deps = await r.json();
+  } catch (_) {}
+  render();
+}
+
+function switchView(v) {
+  currentView = v;
+  ['all','phase','team'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === v);
+  });
+  render();
+}
+
+// --- Filtering ---
+function getFiltered() {
+  const st   = document.getElementById('fStatus').value;
+  const pr   = document.getElementById('fPriority').value;
+  const ph   = document.getElementById('fPhase').value;
+  const q    = document.getElementById('fSearch').value.toLowerCase();
+  const hide = document.getElementById('fHideResolved').checked;
+
+  return deps.filter(d => {
+    if (ph && d.phase !== ph) return false;
+    if (st && d.status !== st) return false;
+    if (pr && d.priority !== pr) return false;
+    if (hide && d.status === 'Resolved') return false;
+    if (q) {
+      const txt = [d.phase, d.blocked_task, d.blocked_team, d.blocking_task, d.blocking_team, d.notes].join(' ').toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function sorted(list) {
+  return [...list].sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'priority') { va = PRIORITY_ORDER[a.priority] ?? 9; vb = PRIORITY_ORDER[b.priority] ?? 9; }
+    else if (sortCol === 'status') { va = STATUS_ORDER[a.status] ?? 9; vb = STATUS_ORDER[b.status] ?? 9; }
+    else if (sortCol === 'due_date') { va = a.due_date || 'zzzz'; vb = b.due_date || 'zzzz'; }
+    else { va = (a[sortCol] || '').toLowerCase(); vb = (b[sortCol] || '').toLowerCase(); }
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+}
+
+// --- Render ---
+function render() {
+  const container = document.getElementById('mainContainer');
+  const filtered = getFiltered();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Stats (always over full list, not filtered)
+  const counts = { Open: 0, 'In Progress': 0, 'In Review': 0, Resolved: 0 };
+  deps.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
+
+  let html = `<div class="stats">
+    <div class="stat s-total">  <div class="count">${deps.length}</div><div class="label">Total</div></div>
+    <div class="stat s-open">   <div class="count">${counts['Open']}</div><div class="label">Open</div></div>
+    <div class="stat s-progress"><div class="count">${counts['In Progress']}</div><div class="label">In Progress</div></div>
+    <div class="stat s-review"> <div class="count">${counts['In Review']}</div><div class="label">In Review</div></div>
+    <div class="stat s-resolved"><div class="count">${counts['Resolved']}</div><div class="label">Resolved</div></div>
+  </div>`;
+
+  if (currentView === 'all') {
+    html += renderTableSection(sorted(filtered), today, true);
+  } else if (currentView === 'phase') {
+    html += renderPhaseView(filtered, today);
+  } else if (currentView === 'team') {
+    html += renderTeamView(filtered, today);
+  }
+
+  const lu = deps.reduce((max, d) => (d.updated_at || '') > max ? d.updated_at : max, '');
+  html += `<div class="last-updated">${lu ? 'Last updated: ' + new Date(lu).toLocaleString() : ''}</div>`;
+
+  container.innerHTML = html;
+  updateSortHeaders();
+}
+
+function renderPhaseView(filtered, today) {
+  let html = '<div class="phase-cards">';
+  PHASES.forEach(ph => {
+    const all   = deps.filter(d => d.phase === ph);
+    const open  = all.filter(d => d.status !== 'Resolved').length;
+    const done  = all.filter(d => d.status === 'Resolved').length;
+    if (all.length === 0) return;
+    html += `<div class="phase-card" onclick="quickFilterPhase('${ph}')">
+      <div class="ph-name">${ph}</div>
+      <div class="ph-stats">
+        <span class="ph-open">${open} open</span>
+        <span class="ph-done">${done} resolved</span>
+        <span>${all.length} total</span>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  const fph = document.getElementById('fPhase').value;
+  const phases = fph ? [fph] : PHASES;
+
+  phases.forEach(ph => {
+    const list = filtered.filter(d => d.phase === ph);
+    if (list.length === 0) return;
+    html += `<div class="team-section">
+      <div class="team-heading">${ph}</div>
+      <div class="table-wrap">
+        ${tableHTML(sorted(list), today, false)}
+      </div>
+    </div>`;
+  });
+
+  if (filtered.length === 0) {
+    html += emptyState();
+  }
+
+  return html;
+}
+
+function renderTeamView(filtered, today) {
+  const teams = [...new Set(deps.flatMap(d => [d.blocked_team, d.blocking_team]))].filter(Boolean).sort();
+
+  const fSearch = document.getElementById('fSearch').value.toLowerCase();
+
+  let html = '';
+  let any = false;
+
+  teams.forEach(team => {
+    if (fSearch && !team.toLowerCase().includes(fSearch) &&
+        !filtered.some(d => d.blocked_team === team || d.blocking_team === team)) return;
+
+    const list = filtered.filter(d => d.blocked_team === team || d.blocking_team === team);
+    if (list.length === 0) return;
+    any = true;
+
+    const blocking = list.filter(d => d.blocking_team === team);
+    const blocked  = list.filter(d => d.blocked_team === team);
+
+    html += `<div class="team-section">
+      <div class="team-heading">${esc(team)}
+        <span style="font-weight:normal;font-size:0.78rem;opacity:0.8;">
+          — blocking ${blocking.length} task${blocking.length !== 1 ? 's' : ''}, blocked by ${blocked.length} task${blocked.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div class="table-wrap">
+        ${tableHTML(sorted(list), today, true, team)}
+      </div>
+    </div>`;
+  });
+
+  if (!any) html += emptyState();
+  return html;
+}
+
+function renderTableSection(list, today, standalone) {
+  if (list.length === 0) return emptyState();
+  return `<div class="table-wrap ${standalone ? 'table-wrap-standalone' : ''}">
+    ${tableHTML(list, today, true)}
+  </div>`;
+}
+
+function tableHTML(list, today, showPhase, highlightTeam) {
+  if (list.length === 0) return '<div style="padding:20px;text-align:center;color:#aaa;background:white;">No dependencies match the current filters.</div>';
+
+  const phCol = showPhase ? `<th onclick="sortBy('phase')" id="th-phase">Phase</th>` : '';
+
+  const rows = list.map(d => {
+    const overdue = d.due_date && d.due_date < today && d.status !== 'Resolved';
+    const sk = d.status.toLowerCase().replace(/ /g, '');
+    const pk = d.priority.toLowerCase();
+    const hilightBlocked  = highlightTeam && d.blocked_team  === highlightTeam ? ' style="background:#fff8e1;"' : '';
+    const hilightBlocking = highlightTeam && d.blocking_team === highlightTeam ? ' style="background:#fce4ec;"' : '';
+    const phCell = showPhase ? `<td><span class="phase-badge">${esc(d.phase || '—')}</span></td>` : '';
+    return `<tr class="${d.status === 'Resolved' ? 'resolved-row' : ''}">
+      ${phCell}
+      <td${hilightBlocked}><strong>${esc(d.blocked_task)}</strong></td>
+      <td${hilightBlocked}>${esc(d.blocked_team)}</td>
+      <td${hilightBlocking}>${esc(d.blocking_task)}</td>
+      <td${hilightBlocking}>${esc(d.blocking_team)}</td>
+      <td class="p-${pk}">${d.priority}</td>
+      <td><span class="badge badge-${sk}">${esc(d.status)}</span></td>
+      <td class="${overdue ? 'overdue' : ''}">${d.due_date ? d.due_date + (overdue ? ' ⚠' : '') : '—'}</td>
+      <td class="notes-cell" title="${esc(d.notes || '')}">${esc(d.notes) || '<span style="color:#ccc">—</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-edit" onclick="openModal('${d.id}')">Edit</button>
+        <button class="btn btn-del"  onclick="del('${d.id}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<table>
+    <thead>
+      <tr>
+        ${phCol}
+        <th onclick="sortBy('blocked_task')"   id="th-blocked_task">Blocked Task</th>
+        <th onclick="sortBy('blocked_team')"   id="th-blocked_team">Blocked Team</th>
+        <th onclick="sortBy('blocking_task')"  id="th-blocking_task">Blocking Task</th>
+        <th onclick="sortBy('blocking_team')"  id="th-blocking_team">Blocking Team</th>
+        <th onclick="sortBy('priority')"       id="th-priority">Priority</th>
+        <th onclick="sortBy('status')"         id="th-status">Status</th>
+        <th onclick="sortBy('due_date')"       id="th-due_date">Due Date</th>
+        <th>Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function emptyState() {
+  return `<div class="empty-state">
+    <strong>No dependencies here</strong>
+    <p>Try adjusting your filters or add a new dependency.</p>
+  </div>`;
+}
+
+function updateSortHeaders() {
+  ['phase','blocked_task','blocked_team','blocking_task','blocking_team','priority','status','due_date'].forEach(col => {
+    document.querySelectorAll('#th-' + col).forEach(el => {
+      el.className = sortCol === col ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
+    });
+  });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  render();
+}
+
+function quickFilterPhase(ph) {
+  document.getElementById('fPhase').value = ph;
+  render();
+}
+
+// --- Modal ---
+function openModal(id) {
+  editId = id || null;
+  const d = id ? deps.find(x => x.id === id) : null;
+  document.getElementById('modalTitle').textContent = d ? 'Edit Dependency' : 'Add Dependency';
+  document.getElementById('f_phase').value         = d?.phase         || 'Phase 1';
+  document.getElementById('f_blocked_task').value  = d?.blocked_task  || '';
+  document.getElementById('f_blocked_team').value  = d?.blocked_team  || '';
+  document.getElementById('f_blocking_task').value = d?.blocking_task || '';
+  document.getElementById('f_blocking_team').value = d?.blocking_team || '';
+  document.getElementById('f_priority').value      = d?.priority      || 'Medium';
+  document.getElementById('f_status').value        = d?.status        || 'Open';
+  document.getElementById('f_due_date').value      = d?.due_date      || '';
+  document.getElementById('f_notes').value         = d?.notes         || '';
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f_blocked_task').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  editId = null;
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('overlay')) closeModal();
+}
+
+function save() {
+  const vals = {
+    phase:         document.getElementById('f_phase').value,
+    blocked_task:  document.getElementById('f_blocked_task').value.trim(),
+    blocked_team:  document.getElementById('f_blocked_team').value.trim(),
+    blocking_task: document.getElementById('f_blocking_task').value.trim(),
+    blocking_team: document.getElementById('f_blocking_team').value.trim(),
+    priority:      document.getElementById('f_priority').value,
+    status:        document.getElementById('f_status').value,
+    due_date:      document.getElementById('f_due_date').value,
+    notes:         document.getElementById('f_notes').value.trim(),
+  };
+
+  if (!vals.blocked_task || !vals.blocked_team || !vals.blocking_task || !vals.blocking_team) {
+    alert('Please fill in all required fields (marked with *).');
+    return;
+  }
+
+  const now = new Date().toISOString();
+  if (editId) {
+    const i = deps.findIndex(d => d.id === editId);
+    deps[i] = { ...deps[i], ...vals, updated_at: now };
+  } else {
+    deps.push({ id: crypto.randomUUID(), ...vals, created_at: now, updated_at: now });
+  }
+
+  closeModal();
+  render();
+}
+
+function del(id) {
+  if (!confirm('Delete this dependency? This cannot be undone.')) return;
+  deps = deps.filter(d => d.id !== id);
+  render();
+}
+
+// --- Import / Export ---
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(deps, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dependencies.json';
+  a.click();
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      deps = JSON.parse(ev.target.result);
+      render();
+    } catch {
+      alert('Could not read file — make sure it is a valid dependencies.json.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+init();
+</script>
+</body>
+</html>
