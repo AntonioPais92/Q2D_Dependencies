@@ -1,0 +1,191 @@
+/* ============================================================
+   SECIL DESIGN SYSTEM — TOKENS
+   Derived from: 2026.04.15 _Budget A3 — Molins template (PPTX)
+   PPTX theme: "28_Custom Design", color scheme "SECIL"
+   ============================================================ */
+
+:root {
+  /* ── BRAND CORE ──────────────────────────────────────────── */
+  --secil-yellow:       #FCB809;  /* accent1 — primary brand */
+  --secil-yellow-deep:  #C99206;  /* accent3 — pressed / on light backgrounds where contrast needed */
+  --secil-charcoal:     #242D31;  /* dk1 / dk2 — primary text & dark surface */
+  --secil-graphite:     #323F45;  /* accent2 — secondary dark surface */
+  --secil-cream:        #EEECE1;  /* lt2 — warm off-white surface */
+  --secil-white:        #FFFFFF;
+
+  /* ── DATA-VIZ + STATUS ACCENTS ───────────────────────────── */
+  --secil-coral:        #FC9053;  /* accent4 — warning / category */
+  --secil-teal:         #44A3BA;  /* accent5 — info / category */
+  --secil-green:        #258F59;  /* accent6 — success / positive */
+  --secil-red:          #C0392B;  /* derived — danger / negative */
+  --secil-amber:        #E0A800;  /* derived — caution */
+
+  /* ── NEUTRAL SCALE (warm, anchored to charcoal + cream) ──── */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #FAF9F5;
+  --neutral-100: #F4F2EA;
+  --neutral-150: #EEECE1;  /* = cream */
+  --neutral-200: #E2DFD3;
+  --neutral-300: #C9C5B6;
+  --neutral-400: #9A9685;
+  --neutral-500: #6F6C5E;
+  --neutral-600: #4D4A40;
+  --neutral-700: #353A3D;
+  --neutral-800: #2A3236;
+  --neutral-900: #242D31;  /* = charcoal */
+  --neutral-950: #161B1E;
+
+  /* ── YELLOW SCALE (for hover/pressed/tints) ──────────────── */
+  --yellow-50:  #FFF8E1;
+  --yellow-100: #FFEDB0;
+  --yellow-200: #FED867;
+  --yellow-300: #FDC835;
+  --yellow-400: #FCB809;  /* = secil-yellow */
+  --yellow-500: #E2A507;
+  --yellow-600: #C99206;  /* = secil-yellow-deep */
+  --yellow-700: #9C7104;
+  --yellow-800: #6E5003;
+
+  /* ── SEMANTIC ROLES ──────────────────────────────────────── */
+  --bg-page:           var(--neutral-50);
+  --bg-surface:        var(--neutral-0);
+  --bg-elevated:       var(--neutral-0);
+  --bg-muted:          var(--neutral-100);
+  --bg-warm:           var(--secil-cream);
+  --bg-inverse:        var(--secil-charcoal);
+  --bg-inverse-soft:   var(--secil-graphite);
+
+  --fg-default:        var(--secil-charcoal);
+  --fg-muted:          var(--neutral-600);
+  --fg-subtle:         var(--neutral-500);
+  --fg-disabled:       var(--neutral-400);
+  --fg-on-dark:        var(--neutral-0);
+  --fg-on-yellow:      var(--secil-charcoal);
+  --fg-brand:          var(--secil-yellow);
+  --fg-brand-deep:     var(--secil-yellow-deep);
+
+  --border-subtle:     var(--neutral-200);
+  --border-default:    var(--neutral-300);
+  --border-strong:     var(--neutral-600);
+  --border-brand:      var(--secil-yellow);
+
+  --status-success:    var(--secil-green);
+  --status-info:       var(--secil-teal);
+  --status-warning:    var(--secil-coral);
+  --status-caution:    var(--secil-amber);
+  --status-danger:     var(--secil-red);
+
+  /* ── TYPOGRAPHY ──────────────────────────────────────────── */
+  --font-display: "Manrope", "Calibri", system-ui, sans-serif;
+  --font-body:    "Inter", "Calibri", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "Consolas", ui-monospace, monospace;
+
+  /* Type scale (modular, 1.200 ratio, anchored at 16px body) */
+  --text-2xs:  11px;   /* legal, footnote */
+  --text-xs:   12px;   /* meta, captions */
+  --text-sm:   14px;   /* body small, dense tables */
+  --text-base: 16px;   /* body default */
+  --text-md:   18px;   /* lead body */
+  --text-lg:   22px;   /* h5 */
+  --text-xl:   28px;   /* h4 */
+  --text-2xl:  36px;   /* h3 */
+  --text-3xl:  48px;   /* h2 */
+  --text-4xl:  64px;   /* h1 */
+  --text-5xl:  88px;   /* display / cover titles */
+
+  /* Line heights */
+  --lh-tight:  1.05;
+  --lh-snug:   1.18;
+  --lh-normal: 1.45;
+  --lh-loose:  1.65;
+
+  /* Letter spacing */
+  --tracking-tight:  -0.02em;
+  --tracking-snug:   -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-wider:  0.12em;  /* for eyebrows / labels uppercase */
+
+  /* Weights */
+  --w-regular: 400;
+  --w-medium:  500;
+  --w-semi:    600;
+  --w-bold:    700;
+  --w-black:   800;
+
+  /* ── SPACING (4px base) ──────────────────────────────────── */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  48px;
+  --space-10: 64px;
+  --space-11: 80px;
+  --space-12: 96px;
+  --space-13: 128px;
+
+  /* ── RADII ────────────────────────────────────────────────
+     The PPTX template uses sharp corners. Keep radii minimal.
+     Reserve > 4px only for pills, avatars, modals.            */
+  --radius-none: 0;
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   10px;
+  --radius-pill: 999px;
+
+  /* ── ELEVATION ────────────────────────────────────────────
+     Subtle, corporate. Avoid soft glowy shadows.               */
+  --shadow-xs:  0 1px 2px rgba(36, 45, 49, 0.06);
+  --shadow-sm:  0 2px 4px rgba(36, 45, 49, 0.08), 0 1px 2px rgba(36, 45, 49, 0.04);
+  --shadow-md:  0 6px 16px rgba(36, 45, 49, 0.10), 0 2px 4px rgba(36, 45, 49, 0.05);
+  --shadow-lg:  0 16px 32px rgba(36, 45, 49, 0.14), 0 4px 8px rgba(36, 45, 49, 0.06);
+  --shadow-focus: 0 0 0 3px rgba(252, 184, 9, 0.35);
+
+  /* ── LAYOUT / GRID ───────────────────────────────────────── */
+  --grid-columns: 12;
+  --grid-gutter:  24px;
+  --grid-margin:  64px;
+
+  /* PPTX slide canvas (template = 10690225 × 7564438 EMU ≈ 4:3 custom) */
+  --slide-w: 1186px;
+  --slide-h: 839px;
+  --slide-ratio: calc(1186 / 839);
+
+  /* ── MOTION ──────────────────────────────────────────────── */
+  --ease-out:  cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in:   cubic-bezier(0.4, 0, 1, 1);
+  --ease-std:  cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:  120ms;
+  --dur-base:  200ms;
+  --dur-slow:  340ms;
+}
+
+/* ============================================================
+   BASE RESET / NORMALIZE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  color: var(--fg-default);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); margin: 0; font-weight: var(--w-bold); letter-spacing: var(--tracking-snug); }
+p { margin: 0; }
+img, svg { display: block; max-width: 100%; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--fg-default); text-decoration: none; }
+a:hover { color: var(--fg-brand-deep); }
+
+::selection { background: var(--secil-yellow); color: var(--secil-charcoal); }

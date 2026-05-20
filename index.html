@@ -1,689 +1,993 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Q2D — Dependency Manager</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #333; }
-
-    header {
-      background: #1a2a3a;
-      color: white;
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header h1 { font-size: 1.2rem; letter-spacing: 0.5px; }
-    header .subtitle { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
-
-    .toolbar {
-      background: white;
-      padding: 12px 24px;
-      border-bottom: 1px solid #ddd;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .btn { padding: 7px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
-    .btn-add    { background: #27ae60; color: white; font-weight: bold; }
-    .btn-dark   { background: #1a2a3a; color: white; }
-    .btn-import { background: #7f8c8d; color: white; cursor: pointer; }
-    .btn-edit   { background: #2980b9; color: white; padding: 4px 10px; font-size: 0.78rem; }
-    .btn-del    { background: #c0392b; color: white; padding: 4px 10px; font-size: 0.78rem; }
-    .btn:hover  { opacity: 0.88; }
-
-    .sep { width: 1px; height: 28px; background: #ddd; margin: 0 4px; }
-    .filter-label { font-size: 0.82rem; color: #666; font-weight: bold; }
-    select, input[type="text"] {
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      font-family: inherit;
-    }
-
-    /* View tabs */
-    .view-tabs {
-      background: #f7f7f7;
-      border-bottom: 1px solid #ddd;
-      padding: 0 24px;
-      display: flex;
-      gap: 0;
-    }
-    .view-tab {
-      padding: 10px 20px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      color: #666;
-      user-select: none;
-    }
-    .view-tab:hover { color: #333; }
-    .view-tab.active { color: #1a2a3a; border-bottom-color: #1a2a3a; font-weight: bold; }
-
-    .container { padding: 20px 24px; }
-
-    /* Stats */
-    .stats { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
-    .stat { background: white; border-radius: 6px; padding: 10px 18px; border-left: 4px solid #ccc; min-width: 110px; }
-    .stat .count { font-size: 1.6rem; font-weight: bold; line-height: 1; }
-    .stat .label { font-size: 0.75rem; color: #666; margin-top: 3px; }
-    .stat.s-open     { border-color: #e74c3c; } .stat.s-open .count     { color: #e74c3c; }
-    .stat.s-progress { border-color: #e67e22; } .stat.s-progress .count { color: #e67e22; }
-    .stat.s-review   { border-color: #2980b9; } .stat.s-review .count   { color: #2980b9; }
-    .stat.s-resolved { border-color: #27ae60; } .stat.s-resolved .count { color: #27ae60; }
-    .stat.s-total    { border-color: #95a5a6; } .stat.s-total .count    { color: #555; }
-
-    /* Phase summary cards */
-    .phase-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-    .phase-card {
-      background: white;
-      border-radius: 6px;
-      padding: 12px 16px;
-      border-top: 4px solid #2980b9;
-      min-width: 160px;
-      cursor: pointer;
-      transition: box-shadow 0.15s;
-    }
-    .phase-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-    .phase-card.active { box-shadow: 0 0 0 2px #2980b9; }
-    .phase-card .ph-name { font-size: 0.9rem; font-weight: bold; color: #1a2a3a; margin-bottom: 6px; }
-    .phase-card .ph-stats { font-size: 0.75rem; color: #666; display: flex; gap: 10px; flex-wrap: wrap; }
-    .ph-open { color: #e74c3c; font-weight: bold; }
-    .ph-done { color: #27ae60; font-weight: bold; }
-
-    /* Team view */
-    .team-section { margin-bottom: 24px; }
-    .team-heading {
-      background: #1a2a3a;
-      color: white;
-      padding: 8px 14px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      border-radius: 4px 4px 0 0;
-    }
-
-    /* Table */
-    .table-wrap { overflow-x: auto; border-radius: 0 0 6px 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-    .table-wrap-standalone { border-radius: 6px; }
-    table { width: 100%; border-collapse: collapse; background: white; min-width: 860px; }
-    th {
-      background: #253545;
-      color: white;
-      padding: 9px 12px;
-      text-align: left;
-      font-size: 0.79rem;
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
-    }
-    th:hover { background: #2d4055; }
-    th.sort-asc::after  { content: ' ▲'; font-size: 0.65rem; }
-    th.sort-desc::after { content: ' ▼'; font-size: 0.65rem; }
-    td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.83rem; vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
-    tr.resolved-row td { opacity: 0.55; }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 9px;
-      border-radius: 12px;
-      font-size: 0.73rem;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-    .badge-open       { background: #fde8e8; color: #c0392b; }
-    .badge-inprogress { background: #fef3cd; color: #b7770d; }
-    .badge-inreview   { background: #d6eaf8; color: #1a6fa0; }
-    .badge-resolved   { background: #d5f5e3; color: #1a7a40; }
-
-    .phase-badge {
-      display: inline-block;
-      padding: 1px 7px;
-      border-radius: 10px;
-      font-size: 0.72rem;
-      background: #e8eaf6;
-      color: #3949ab;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-
-    .p-low      { color: #27ae60; font-weight: bold; font-size: 0.8rem; }
-    .p-medium   { color: #e67e22; font-weight: bold; font-size: 0.8rem; }
-    .p-high     { color: #d35400; font-weight: bold; font-size: 0.8rem; }
-    .p-critical { color: #c0392b; font-weight: bold; font-size: 0.8rem; }
-
-    .overdue { color: #c0392b; font-weight: bold; }
-    .notes-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; }
-
-    .empty-state { text-align: center; padding: 50px 20px; color: #aaa; background: white; border-radius: 6px; }
-    .empty-state p { margin-top: 8px; font-size: 0.9rem; }
-
-    /* Modal */
-    .overlay {
-      display: none;
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.45);
-      z-index: 999;
-      justify-content: center;
-      align-items: center;
-    }
-    .overlay.open { display: flex; }
-    .modal {
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      width: 640px;
-      max-width: 96vw;
-      max-height: 92vh;
-      overflow-y: auto;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-    }
-    .modal h2 { font-size: 1.05rem; margin-bottom: 18px; color: #1a2a3a; }
-
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .fg { display: flex; flex-direction: column; gap: 5px; }
-    .fg.full { grid-column: 1 / -1; }
-    .fg label { font-size: 0.78rem; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.4px; }
-    .fg input, .fg select, .fg textarea {
-      padding: 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.88rem;
-      font-family: inherit;
-    }
-    .fg textarea { resize: vertical; min-height: 70px; }
-    .fg input:focus, .fg select:focus, .fg textarea:focus {
-      outline: none;
-      border-color: #2980b9;
-      box-shadow: 0 0 0 2px rgba(41,128,185,0.15);
-    }
-
-    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-    .btn-cancel { background: #ecf0f1; color: #555; }
-    .required { color: #e74c3c; }
-    .last-updated { font-size: 0.75rem; color: #aaa; margin-top: 14px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q2D · Dependency Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-body);font-size:14px;color:var(--fg-default);background:var(--bg-page);-webkit-font-smoothing:antialiased}
+#root{display:flex;min-height:100vh}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--neutral-300);border-radius:3px}
+.dtbl{width:100%;border-collapse:collapse;font-size:13px}
+.dtbl th{padding:10px 14px;text-align:left;background:var(--bg-warm);font-family:var(--font-display);font-size:10px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--border-default);white-space:nowrap;cursor:pointer;user-select:none}
+.dtbl th:hover{background:var(--neutral-200)}
+.dtbl td{padding:10px 14px;border-bottom:1px solid var(--border-subtle);vertical-align:middle}
+.dtbl tbody tr:hover td{background:var(--neutral-50)}
+.dtbl tbody tr:last-child td{border-bottom:none}
+.ff{display:flex;flex-direction:column;gap:6px}
+.ff label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-muted)}
+.ff input,.ff select,.ff textarea{font-family:var(--font-body);font-size:13px;padding:8px 10px;border:1px solid var(--border-default);background:#fff;color:var(--fg-default);border-radius:2px;outline:none;transition:border-color 120ms,box-shadow 120ms;width:100%}
+.ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--secil-yellow);box-shadow:var(--shadow-focus)}
+.ff textarea{resize:vertical;min-height:68px}
+@keyframes fadeUp{from{transform:translateY(4px)}to{transform:none}}
+.au{animation:fadeUp 180ms cubic-bezier(0.22,1,0.36,1) both}
+.btn-ic{background:none;border:none;cursor:pointer;padding:4px;display:inline-flex;align-items:center;border-radius:2px;transition:color 120ms}
+</style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+const TODAY = new Date().toISOString().slice(0, 10);
 
-<header>
-  <div>
-    <h1>Q2D &mdash; Dependency Manager</h1>
-    <div class="subtitle">Track cross-team task dependencies across all phases</div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <button class="btn btn-dark" onclick="exportJSON()">Export JSON</button>
-    <label class="btn btn-import">Import JSON
-      <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
-    </label>
-  </div>
-</header>
-
-<!-- View tabs -->
-<div class="view-tabs">
-  <div class="view-tab active" id="tab-all"    onclick="switchView('all')">All Dependencies</div>
-  <div class="view-tab"        id="tab-phase"  onclick="switchView('phase')">By Phase</div>
-  <div class="view-tab"        id="tab-team"   onclick="switchView('team')">By Team</div>
-</div>
-
-<!-- Filters toolbar -->
-<div class="toolbar">
-  <button class="btn btn-add" onclick="openModal()">+ Add Dependency</button>
-  <div class="sep"></div>
-  <span class="filter-label">Filter:</span>
-  <select id="fPhase" onchange="render()">
-    <option value="">All Phases</option>
-    <option value="Q2D - P1: Quarry Raw Material Management">P1: Quarry Raw Material Management</option>
-    <option value="Q2D - P2: Quality KPI Monitoring">P2: Quality KPI Monitoring</option>
-    <option value="Q2D - P3: Clinker KPI Monitoring & Team Optimization">P3: Clinker KPI Monitoring & Team Optimization</option>
-    <option value="Q2D - P4: Additives Management">P4: Additives Management</option>
-    <option value="Q2D - P5: Packaging Performance Monitoring">P5: Packaging Performance Monitoring</option>
-    <option value="Q2D - P6: Clinker Emissions & Environmental Performance monitoring">P6: Clinker Emissions & Environmental Performance monitoring</option>
-  </select>
-  <select id="fStatus" onchange="render()">
-    <option value="">All Statuses</option>
-    <option value="Open">Open</option>
-    <option value="In Progress">In Progress</option>
-    <option value="In Review">In Review</option>
-    <option value="Resolved">Resolved</option>
-  </select>
-  <select id="fPriority" onchange="render()">
-    <option value="">All Priorities</option>
-    <option value="Critical">Critical</option>
-    <option value="High">High</option>
-    <option value="Medium">Medium</option>
-    <option value="Low">Low</option>
-  </select>
-  <input type="text" id="fSearch" placeholder="Search tasks, teams..." oninput="render()" style="width:190px;">
-  <label style="font-size:0.82rem;color:#666;cursor:pointer;">
-    <input type="checkbox" id="fHideResolved" onchange="render()"> Hide resolved
-  </label>
-</div>
-
-<div class="container" id="mainContainer"></div>
-
-<!-- Modal -->
-<div class="overlay" id="overlay" onclick="overlayClick(event)">
-  <div class="modal">
-    <h2 id="modalTitle">Add Dependency</h2>
-    <div class="form-grid">
-      <div class="fg full">
-        <label>Phase <span class="required">*</span></label>
-        <select id="f_phase">
-          <option value="Q2D - P1: Quarry Raw Material Management">P1: Quarry Raw Material Management</option>
-          <option value="Q2D - P2: Quality KPI Monitoring">P2: Quality KPI Monitoring</option>
-          <option value="Q2D - P3: Clinker KPI Monitoring & Team Optimization">P3: Clinker KPI Monitoring & Team Optimization</option>
-          <option value="Q2D - P4: Additives Management">P4: Additives Management</option>
-          <option value="Q2D - P5: Packaging Performance Monitoring">P5: Packaging Performance Monitoring</option>
-          <option value="Q2D - P6: Clinker Emissions & Environmental Performance monitoring">P6: Clinker Emissions & Environmental Performance monitoring</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Blocked Task <span class="required">*</span></label>
-        <input id="f_blocked_task" placeholder="Task that is waiting...">
-      </div>
-      <div class="fg">
-        <label>Blocked Team / Dept <span class="required">*</span></label>
-        <input id="f_blocked_team" placeholder="e.g. Engineering">
-      </div>
-      <div class="fg">
-        <label>Blocking Task <span class="required">*</span></label>
-        <input id="f_blocking_task" placeholder="Task that must happen first...">
-      </div>
-      <div class="fg">
-        <label>Blocking Team / Dept <span class="required">*</span></label>
-        <input id="f_blocking_team" placeholder="e.g. Operations">
-      </div>
-      <div class="fg">
-        <label>Priority / Criticality</label>
-        <select id="f_priority">
-          <option value="Low">Low</option>
-          <option value="Medium" selected>Medium</option>
-          <option value="High">High</option>
-          <option value="Critical">Critical</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Status</label>
-        <select id="f_status">
-          <option value="Open" selected>Open</option>
-          <option value="In Progress">In Progress</option>
-          <option value="In Review">In Review</option>
-          <option value="Resolved">Resolved</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Due Date</label>
-        <input type="date" id="f_due_date">
-      </div>
-      <div class="fg full">
-        <label>Notes</label>
-        <textarea id="f_notes" placeholder="Context, links, decisions..."></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-dark" onclick="save()">Save</button>
-    </div>
-  </div>
-</div>
-
-<script>
-let deps = [];
-let editId = null;
-let sortCol = 'priority';
-let sortDir = 1;
-let currentView = 'all';
-
-const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-const STATUS_ORDER   = { Open: 0, 'In Progress': 1, 'In Review': 2, Resolved: 3 };
 const PHASES = [
-  'Q2D - P1: Quarry Raw Material Management',
-  'Q2D - P2: Quality KPI Monitoring',
-  'Q2D - P3: Clinker KPI Monitoring & Team Optimization',
-  'Q2D - P4: Additives Management',
-  'Q2D - P5: Packaging Performance Monitoring',
-  'Q2D - P6: Clinker Emissions & Environmental Performance monitoring',
+  { id:'P1', name:'Quarry Raw Material Management',                  short:'Quarry' },
+  { id:'P2', name:'Quality KPI Monitoring',                          short:'Quality KPI' },
+  { id:'P3', name:'Clinker KPI Monitoring & Team Optimisation',      short:'Clinker KPI' },
+  { id:'P4', name:'Additives Management',                            short:'Additives' },
+  { id:'P5', name:'Packaging Performance Monitoring',                short:'Packaging' },
+  { id:'P6', name:'Clinker Emissions & Environmental Performance',   short:'Emissions' },
 ];
+const PHASE_COLORS = ['#FCB809','#44A3BA','#258F59','#FC9053','#C0392B','#4D4A40'];
+const PRIORITIES = ['Low','Medium','High','Critical'];
+const STATUSES   = ['Open','In Progress','In Review','Resolved'];
 
-async function init() {
-  try {
-    const r = await fetch('dependencies.json?t=' + Date.now());
-    if (r.ok) deps = await r.json();
-  } catch (_) {}
-  render();
-}
+// ── HELPERS ───────────────────────────────────────────────────
+const isOverdue = d => d.status !== 'Resolved' && d.dueDate && d.dueDate < TODAY;
+const fmtDate   = d => { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; };
+const nextId    = deps => 'D' + String(Math.max(0, ...deps.map(d => parseInt(d.id.slice(1))).filter(n => !isNaN(n))) + 1).padStart(3, '0');
 
-function switchView(v) {
-  currentView = v;
-  ['all','phase','team'].forEach(t => {
-    document.getElementById('tab-' + t).classList.toggle('active', t === v);
-  });
-  render();
-}
-
-// --- Filtering ---
-function getFiltered() {
-  const st   = document.getElementById('fStatus').value;
-  const pr   = document.getElementById('fPriority').value;
-  const ph   = document.getElementById('fPhase').value;
-  const q    = document.getElementById('fSearch').value.toLowerCase();
-  const hide = document.getElementById('fHideResolved').checked;
-
-  return deps.filter(d => {
-    if (ph && d.phase !== ph) return false;
-    if (st && d.status !== st) return false;
-    if (pr && d.priority !== pr) return false;
-    if (hide && d.status === 'Resolved') return false;
-    if (q) {
-      const txt = [d.phase, d.blocked_task, d.blocked_team, d.blocking_task, d.blocking_team, d.notes].join(' ').toLowerCase();
-      if (!txt.includes(q)) return false;
+function applyFilters(list, f) {
+  return list.filter(d => {
+    if (f.hideResolved && d.status === 'Resolved') return false;
+    if (f.phase    && d.phase    !== f.phase)    return false;
+    if (f.status   && d.status   !== f.status)   return false;
+    if (f.priority && d.priority !== f.priority) return false;
+    if (f.search) {
+      const q = f.search.toLowerCase();
+      return [d.blockedTask, d.blockedTeam, d.blockingTask, d.blockingTeam, d.notes, d.id]
+        .some(v => (v || '').toLowerCase().includes(q));
     }
     return true;
   });
 }
 
-function sorted(list) {
-  return [...list].sort((a, b) => {
-    let va, vb;
-    if (sortCol === 'priority') { va = PRIORITY_ORDER[a.priority] ?? 9; vb = PRIORITY_ORDER[b.priority] ?? 9; }
-    else if (sortCol === 'status') { va = STATUS_ORDER[a.status] ?? 9; vb = STATUS_ORDER[b.status] ?? 9; }
-    else if (sortCol === 'due_date') { va = a.due_date || 'zzzz'; vb = b.due_date || 'zzzz'; }
-    else { va = (a[sortCol] || '').toLowerCase(); vb = (b[sortCol] || '').toLowerCase(); }
-    return va < vb ? -sortDir : va > vb ? sortDir : 0;
-  });
+// ── ICON ──────────────────────────────────────────────────────
+const ICONS = {
+  list:      ['M8 6h13','M8 12h13','M8 18h13','M3 6h.01','M3 12h.01','M3 18h.01'],
+  grid:      ['M3 3h7v7H3z','M14 3h7v7h-7z','M3 14h7v7H3z','M14 14h7v7h-7z'],
+  users:     ['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2','M9 11a4 4 0 100-8 4 4 0 000 8z','M23 21v-2a4 4 0 00-3-3.87','M16 3.13a4 4 0 010 7.75'],
+  plus:      ['M12 5v14','M5 12h14'],
+  download:  ['M12 3v12','M8 11l4 4 4-4','M4 17v3h16v-3'],
+  upload:    ['M12 15V3','M8 7l4-4 4 4','M4 17v3h16v-3'],
+  search:    ['M21 21l-4.3-4.3','M11 19a8 8 0 100-16 8 8 0 000 16z'],
+  edit:      ['M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7','M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z'],
+  trash:     ['M3 6h18','M8 6V4h8v2','M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6'],
+  x:         ['M18 6L6 18','M6 6l12 12'],
+  chevDown:  ['M6 9l6 6 6-6'],
+  chevRight: ['M9 18l6-6-6-6'],
+  sortAsc:   ['M12 19V5','M5 12l7-7 7 7'],
+  sortDesc:  ['M12 5v14','M5 12l7 7 7-7'],
+  alert:     ['M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z','M12 9v4','M12 17h.01'],
+  check:     ['M20 6L9 17l-5-5'],
+  link:      ['M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71','M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71'],
+};
+function Icon({ name, size=16, color='currentColor', style={} }) {
+  const paths = ICONS[name] || [];
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color}
+         strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0, ...style }}>
+      {paths.map((p, i) => <path key={i} d={p} />)}
+    </svg>
+  );
 }
 
-// --- Render ---
-function render() {
-  const container = document.getElementById('mainContainer');
-  const filtered = getFiltered();
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Stats (always over full list, not filtered)
-  const counts = { Open: 0, 'In Progress': 0, 'In Review': 0, Resolved: 0 };
-  deps.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
-
-  let html = `<div class="stats">
-    <div class="stat s-total">  <div class="count">${deps.length}</div><div class="label">Total</div></div>
-    <div class="stat s-open">   <div class="count">${counts['Open']}</div><div class="label">Open</div></div>
-    <div class="stat s-progress"><div class="count">${counts['In Progress']}</div><div class="label">In Progress</div></div>
-    <div class="stat s-review"> <div class="count">${counts['In Review']}</div><div class="label">In Review</div></div>
-    <div class="stat s-resolved"><div class="count">${counts['Resolved']}</div><div class="label">Resolved</div></div>
-  </div>`;
-
-  if (currentView === 'all') {
-    html += renderTableSection(sorted(filtered), today, true);
-  } else if (currentView === 'phase') {
-    html += renderPhaseView(filtered, today);
-  } else if (currentView === 'team') {
-    html += renderTeamView(filtered, today);
-  }
-
-  const lu = deps.reduce((max, d) => (d.updated_at || '') > max ? d.updated_at : max, '');
-  html += `<div class="last-updated">${lu ? 'Last updated: ' + new Date(lu).toLocaleString() : ''}</div>`;
-
-  container.innerHTML = html;
-  updateSortHeaders();
+// ── BADGES ────────────────────────────────────────────────────
+function PhaseBadge({ phase }) {
+  const idx = PHASES.findIndex(p => p.id === phase);
+  const color = PHASE_COLORS[idx] || '#9A9685';
+  return (
+    <span style={{ display:'inline-flex', fontWeight:700, fontSize:10, letterSpacing:'0.07em',
+      textTransform:'uppercase', padding:'2px 7px', borderRadius:2,
+      background: color + '22', color, fontFamily:'Manrope', whiteSpace:'nowrap' }}>
+      {phase}
+    </span>
+  );
 }
 
-function renderPhaseView(filtered, today) {
-  let html = '<div class="phase-cards">';
-  PHASES.forEach(ph => {
-    const all   = deps.filter(d => d.phase === ph);
-    const open  = all.filter(d => d.status !== 'Resolved').length;
-    const done  = all.filter(d => d.status === 'Resolved').length;
-    if (all.length === 0) return;
-    html += `<div class="phase-card" onclick="quickFilterPhase('${ph}')">
-      <div class="ph-name">${ph}</div>
-      <div class="ph-stats">
-        <span class="ph-open">${open} open</span>
-        <span class="ph-done">${done} resolved</span>
-        <span>${all.length} total</span>
-      </div>
-    </div>`;
-  });
-  html += '</div>';
-
-  const fph = document.getElementById('fPhase').value;
-  const phases = fph ? [fph] : PHASES;
-
-  phases.forEach(ph => {
-    const list = filtered.filter(d => d.phase === ph);
-    if (list.length === 0) return;
-    html += `<div class="team-section">
-      <div class="team-heading">${ph}</div>
-      <div class="table-wrap">
-        ${tableHTML(sorted(list), today, false)}
-      </div>
-    </div>`;
-  });
-
-  if (filtered.length === 0) {
-    html += emptyState();
-  }
-
-  return html;
+function StatusBadge({ status }) {
+  const map = {
+    'Open':        ['#F4F2EA', '#4D4A40'],
+    'In Progress': ['rgba(224,168,0,0.14)', '#7A5E02'],
+    'In Review':   ['rgba(68,163,186,0.15)', '#1F6E82'],
+    'Resolved':    ['rgba(37,143,89,0.12)', '#1A6B41'],
+  };
+  const [bg, fg] = map[status] || map['Open'];
+  return (
+    <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontWeight:600, fontSize:10,
+      letterSpacing:'0.04em', textTransform:'uppercase', padding:'3px 8px', borderRadius:2,
+      background:bg, color:fg, whiteSpace:'nowrap' }}>
+      <span style={{ width:5, height:5, borderRadius:'50%', background:'currentColor', flexShrink:0 }} />
+      {status}
+    </span>
+  );
 }
 
-function renderTeamView(filtered, today) {
-  const teams = [...new Set(deps.flatMap(d => [d.blocked_team, d.blocking_team]))].filter(Boolean).sort();
-
-  const fSearch = document.getElementById('fSearch').value.toLowerCase();
-
-  let html = '';
-  let any = false;
-
-  teams.forEach(team => {
-    if (fSearch && !team.toLowerCase().includes(fSearch) &&
-        !filtered.some(d => d.blocked_team === team || d.blocking_team === team)) return;
-
-    const list = filtered.filter(d => d.blocked_team === team || d.blocking_team === team);
-    if (list.length === 0) return;
-    any = true;
-
-    const blocking = list.filter(d => d.blocking_team === team);
-    const blocked  = list.filter(d => d.blocked_team === team);
-
-    html += `<div class="team-section">
-      <div class="team-heading">${esc(team)}
-        <span style="font-weight:normal;font-size:0.78rem;opacity:0.8;">
-          — blocking ${blocking.length} task${blocking.length !== 1 ? 's' : ''}, blocked by ${blocked.length} task${blocked.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-      <div class="table-wrap">
-        ${tableHTML(sorted(list), today, true, team)}
-      </div>
-    </div>`;
-  });
-
-  if (!any) html += emptyState();
-  return html;
+function PriorityBadge({ priority }) {
+  const map = {
+    'Low':      ['#F4F2EA', '#6F6C5E'],
+    'Medium':   ['rgba(68,163,186,0.15)', '#1F6E82'],
+    'High':     ['rgba(252,144,83,0.16)', '#B5471B'],
+    'Critical': ['rgba(192,57,43,0.12)', '#922B21'],
+  };
+  const [bg, fg] = map[priority] || map['Low'];
+  return (
+    <span style={{ display:'inline-flex', fontWeight:600, fontSize:10, letterSpacing:'0.04em',
+      textTransform:'uppercase', padding:'3px 8px', borderRadius:2,
+      background:bg, color:fg, whiteSpace:'nowrap' }}>
+      {priority}
+    </span>
+  );
 }
 
-function renderTableSection(list, today, standalone) {
-  if (list.length === 0) return emptyState();
-  return `<div class="table-wrap ${standalone ? 'table-wrap-standalone' : ''}">
-    ${tableHTML(list, today, true)}
-  </div>`;
-}
+// ── DEP TABLE ─────────────────────────────────────────────────
+function DepTable({ deps, ownerMode, density, onEdit, onDelete, onView }) {
+  const [sort, setSort] = useState({ col:'dueDate', dir:'asc' });
+  const rowPad = density === 'compact' ? '7px 14px' : '11px 14px';
 
-function tableHTML(list, today, showPhase, highlightTeam) {
-  if (list.length === 0) return '<div style="padding:20px;text-align:center;color:#aaa;background:white;">No dependencies match the current filters.</div>';
-
-  const phCol = showPhase ? `<th onclick="sortBy('phase')" id="th-phase">Phase</th>` : '';
-
-  const rows = list.map(d => {
-    const overdue = d.due_date && d.due_date < today && d.status !== 'Resolved';
-    const sk = d.status.toLowerCase().replace(/ /g, '');
-    const pk = d.priority.toLowerCase();
-    const hilightBlocked  = highlightTeam && d.blocked_team  === highlightTeam ? ' style="background:#fff8e1;"' : '';
-    const hilightBlocking = highlightTeam && d.blocking_team === highlightTeam ? ' style="background:#fce4ec;"' : '';
-    const phCell = showPhase ? `<td><span class="phase-badge">${esc(d.phase || '—')}</span></td>` : '';
-    return `<tr class="${d.status === 'Resolved' ? 'resolved-row' : ''}">
-      ${phCell}
-      <td${hilightBlocked}><strong>${esc(d.blocked_task)}</strong></td>
-      <td${hilightBlocked}>${esc(d.blocked_team)}</td>
-      <td${hilightBlocking}>${esc(d.blocking_task)}</td>
-      <td${hilightBlocking}>${esc(d.blocking_team)}</td>
-      <td class="p-${pk}">${d.priority}</td>
-      <td><span class="badge badge-${sk}">${esc(d.status)}</span></td>
-      <td class="${overdue ? 'overdue' : ''}">${d.due_date ? d.due_date + (overdue ? ' ⚠' : '') : '—'}</td>
-      <td class="notes-cell" title="${esc(d.notes || '')}">${esc(d.notes) || '<span style="color:#ccc">—</span>'}</td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-edit" onclick="openModal('${d.id}')">Edit</button>
-        <button class="btn btn-del"  onclick="del('${d.id}')">Delete</button>
-      </td>
-    </tr>`;
-  }).join('');
-
-  return `<table>
-    <thead>
-      <tr>
-        ${phCol}
-        <th onclick="sortBy('blocked_task')"   id="th-blocked_task">Blocked Task</th>
-        <th onclick="sortBy('blocked_team')"   id="th-blocked_team">Blocked Team</th>
-        <th onclick="sortBy('blocking_task')"  id="th-blocking_task">Blocking Task</th>
-        <th onclick="sortBy('blocking_team')"  id="th-blocking_team">Blocking Team</th>
-        <th onclick="sortBy('priority')"       id="th-priority">Priority</th>
-        <th onclick="sortBy('status')"         id="th-status">Status</th>
-        <th onclick="sortBy('due_date')"       id="th-due_date">Due Date</th>
-        <th>Notes</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
-
-function emptyState() {
-  return `<div class="empty-state">
-    <strong>No dependencies here</strong>
-    <p>Try adjusting your filters or add a new dependency.</p>
-  </div>`;
-}
-
-function updateSortHeaders() {
-  ['phase','blocked_task','blocked_team','blocking_task','blocking_team','priority','status','due_date'].forEach(col => {
-    document.querySelectorAll('#th-' + col).forEach(el => {
-      el.className = sortCol === col ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
+  const sorted = useMemo(() => {
+    const priOrder = { Critical:0, High:1, Medium:2, Low:3 };
+    const stOrder  = { 'Open':0, 'In Progress':1, 'In Review':2, 'Resolved':3 };
+    return [...deps].sort((a, b) => {
+      let va = a[sort.col] ?? '', vb = b[sort.col] ?? '';
+      if (sort.col === 'priority') { va = priOrder[va] ?? 9; vb = priOrder[vb] ?? 9; }
+      if (sort.col === 'status')   { va = stOrder[va]  ?? 9; vb = stOrder[vb]  ?? 9; }
+      if (va < vb) return sort.dir === 'asc' ? -1 : 1;
+      if (va > vb) return sort.dir === 'asc' ?  1 : -1;
+      return 0;
     });
+  }, [deps, sort]);
+
+  const toggleSort = col =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir:'asc' });
+
+  const SortIcon = ({ col }) => {
+    if (sort.col !== col) return <Icon name="chevDown" size={11} color="var(--neutral-400)" />;
+    return <Icon name={sort.dir === 'asc' ? 'sortAsc' : 'sortDesc'} size={11} color="var(--secil-yellow)" />;
+  };
+
+  const Th = ({ col, label, w }) => (
+    <th onClick={() => toggleSort(col)} style={{ width: w }}>
+      <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+        {label}<SortIcon col={col} />
+      </span>
+    </th>
+  );
+
+  if (deps.length === 0) {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+        padding:'60px 40px', gap:10, color:'var(--fg-subtle)' }}>
+        <Icon name="search" size={28} color="var(--neutral-300)" />
+        <span style={{ fontSize:14 }}>No dependencies match the current filters.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflowX:'auto' }}>
+      <table className="dtbl">
+        <thead>
+          <tr>
+            <Th col="id"           label="ID"            w={58}  />
+            <Th col="blockedTask"  label="Blocked Task"          />
+            <Th col="blockedTeam"  label="Blocked Team"  w={130} />
+            <Th col="blockingTask" label="Blocking Task"         />
+            <Th col="blockingTeam" label="Blocking Team" w={130} />
+            <Th col="phase"        label="Phase"         w={66}  />
+            <Th col="priority"     label="Priority"      w={88}  />
+            <Th col="status"       label="Status"        w={110} />
+            <Th col="dueDate"      label="Due Date"      w={100} />
+            {ownerMode && <th style={{ width:68 }}></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(dep => {
+            const overdue = isOverdue(dep);
+            return (
+              <tr key={dep.id} className="au" style={{ cursor:'pointer' }} onClick={() => onView && onView(dep)}>
+                <td style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'var(--fg-subtle)',
+                  fontVariantNumeric:'tabular-nums', padding:rowPad }}>
+                  {dep.id}
+                </td>
+                <td style={{ padding:rowPad }}>
+                  <span style={{ fontWeight:500, maxWidth:220, display:'block', textWrap:'pretty', lineHeight:1.35 }}>
+                    {dep.blockedTask}
+                  </span>
+                </td>
+                <td style={{ color:'var(--fg-muted)', fontSize:12, padding:rowPad }}>{dep.blockedTeam}</td>
+                <td style={{ padding:rowPad }}>
+                  <span style={{ color:'var(--fg-muted)', maxWidth:220, display:'block', textWrap:'pretty', lineHeight:1.35 }}>
+                    {dep.blockingTask}
+                  </span>
+                </td>
+                <td style={{ color:'var(--fg-muted)', fontSize:12, padding:rowPad }}>{dep.blockingTeam}</td>
+                <td style={{ padding:rowPad }}><PhaseBadge phase={dep.phase} /></td>
+                <td style={{ padding:rowPad }}><PriorityBadge priority={dep.priority} /></td>
+                <td style={{ padding:rowPad }}><StatusBadge status={dep.status} /></td>
+                <td style={{ padding:rowPad }}>
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:5,
+                    fontFamily:'JetBrains Mono', fontSize:11,
+                    color: overdue ? 'var(--secil-red)' : 'var(--fg-muted)',
+                    fontVariantNumeric:'tabular-nums' }}>
+                    {overdue && <Icon name="alert" size={12} color="var(--secil-red)" />}
+                    {fmtDate(dep.dueDate)}
+                  </span>
+                </td>
+                {ownerMode && (
+                  <td style={{ padding:rowPad }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display:'flex', gap:2, justifyContent:'flex-end' }}>
+                      <button className="btn-ic" title="Edit" onClick={() => onEdit(dep)}
+                        style={{ color:'var(--fg-subtle)' }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--fg-default)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-subtle)'}>
+                        <Icon name="edit" size={14} color="currentColor" />
+                      </button>
+                      <button className="btn-ic" title="Delete" onClick={() => onDelete(dep.id)}
+                        style={{ color:'var(--fg-subtle)' }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--secil-red)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-subtle)'}>
+                        <Icon name="trash" size={14} color="currentColor" />
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── BY PHASE VIEW ─────────────────────────────────────────────
+function ByPhaseView({ deps, allDeps, ownerMode, density, onEdit, onDelete, onView }) {
+  const [expanded, setExpanded] = useState(null);
+  return (
+    <div style={{ padding:'24px', display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+        {PHASES.map((phase, idx) => {
+          const all  = allDeps.filter(d => d.phase === phase.id);
+          const open = all.filter(d => d.status !== 'Resolved').length;
+          const res  = all.filter(d => d.status === 'Resolved').length;
+          const over = all.filter(d => isOverdue(d)).length;
+          const pct  = all.length ? Math.round((res / all.length) * 100) : 0;
+          const isExp = expanded === phase.id;
+          const color = PHASE_COLORS[idx];
+          return (
+            <div key={phase.id} onClick={() => setExpanded(isExp ? null : phase.id)}
+              style={{ background:'#fff', border:'1px solid var(--border-subtle)',
+                borderTop:`3px solid ${color}`, cursor:'pointer', transition:'box-shadow 120ms' }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+              <div style={{ padding:'16px 18px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+                  <div>
+                    <div style={{ fontFamily:'Manrope', fontSize:9, fontWeight:700, letterSpacing:'0.12em',
+                      textTransform:'uppercase', color:'var(--fg-subtle)', marginBottom:4 }}>{phase.id}</div>
+                    <div style={{ fontFamily:'Manrope', fontWeight:700, fontSize:13, lineHeight:1.35, maxWidth:200 }}>
+                      {phase.name}
+                    </div>
+                  </div>
+                  <Icon name={isExp ? 'chevDown' : 'chevRight'} size={15} color="var(--fg-subtle)" />
+                </div>
+                <div style={{ display:'flex', gap:18, marginBottom:12, flexWrap:'wrap' }}>
+                  {[
+                    { v:open, label:'OPEN',     c:'var(--fg-default)' },
+                    { v:res,  label:'RESOLVED', c:'var(--secil-green)' },
+                    ...(over > 0 ? [{ v:over, label:'OVERDUE', c:'var(--secil-red)' }] : []),
+                  ].map(({ v, label, c }) => (
+                    <div key={label}>
+                      <div style={{ fontFamily:'Manrope', fontWeight:800, fontSize:26, lineHeight:1,
+                        letterSpacing:'-0.02em', color:c }}>{v}</div>
+                      <div style={{ fontSize:9, color:'var(--fg-subtle)', marginTop:2,
+                        letterSpacing:'0.08em', fontWeight:600 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ height:3, background:'var(--bg-muted)', borderRadius:2, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${pct}%`, background:'var(--secil-green)',
+                    transition:'width 340ms var(--ease-out)' }} />
+                </div>
+                <div style={{ fontSize:10, color:'var(--fg-subtle)', marginTop:4 }}>
+                  {pct}% resolved · {all.length} total
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {expanded && (() => {
+        const phase = PHASES.find(p => p.id === expanded);
+        const phaseDeps = deps.filter(d => d.phase === expanded);
+        return (
+          <div style={{ background:'#fff', border:'1px solid var(--border-subtle)', animation:'fadeUp 200ms var(--ease-out) both' }}>
+            <div style={{ padding:'13px 18px', borderBottom:'1px solid var(--border-subtle)',
+              display:'flex', alignItems:'center', gap:10 }}>
+              <PhaseBadge phase={expanded} />
+              <span style={{ fontFamily:'Manrope', fontWeight:700, fontSize:14 }}>{phase.name}</span>
+              <span style={{ fontSize:12, color:'var(--fg-subtle)', marginLeft:'auto' }}>
+                {phaseDeps.length} {phaseDeps.length === 1 ? 'dependency' : 'dependencies'}
+              </span>
+            </div>
+            <DepTable deps={phaseDeps} ownerMode={ownerMode} density={density} onEdit={onEdit} onDelete={onDelete} onView={onView} />
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ── BY TEAM VIEW ──────────────────────────────────────────────
+function ByTeamView({ deps, allDeps, ownerMode, density, onEdit, onDelete, onView }) {
+  const [expanded, setExpanded] = useState(null);
+  const teams = useMemo(() => {
+    const set = new Set();
+    allDeps.forEach(d => { set.add(d.blockedTeam); set.add(d.blockingTeam); });
+    return [...set].sort();
+  }, [allDeps]);
+
+  return (
+    <div style={{ padding:'24px', display:'flex', flexDirection:'column', gap:10 }}>
+      {teams.map(team => {
+        const blocking    = deps.filter(d => d.blockingTeam === team);
+        const blocked     = deps.filter(d => d.blockedTeam  === team);
+        const openBlock   = blocking.filter(d => d.status !== 'Resolved').length;
+        const openBlocked = blocked.filter(d => d.status !== 'Resolved').length;
+        const total       = blocking.length + blocked.length;
+        if (total === 0) return null;
+        const isExp = expanded === team;
+        return (
+          <div key={team} style={{ background:'#fff', border:'1px solid var(--border-subtle)' }}>
+            <div style={{ padding:'13px 18px', display:'flex', alignItems:'center', gap:12,
+              cursor:'pointer', transition:'background 120ms' }}
+              onClick={() => setExpanded(isExp ? null : team)}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--neutral-50)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ fontFamily:'Manrope', fontWeight:700, fontSize:14, flex:1 }}>{team}</span>
+              <div style={{ display:'flex', gap:14, alignItems:'center' }}>
+                {openBlock > 0 && (
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12,
+                    color:'var(--secil-red)', fontWeight:600 }}>
+                    <Icon name="alert" size={13} color="currentColor" />
+                    Causing {openBlock} open block{openBlock > 1 ? 's' : ''}
+                  </span>
+                )}
+                {openBlocked > 0 && (
+                  <span style={{ fontSize:12, color:'var(--fg-muted)', fontWeight:500 }}>
+                    Blocked: {openBlocked} open
+                  </span>
+                )}
+                <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'var(--fg-subtle)',
+                  fontVariantNumeric:'tabular-nums' }}>{total}</span>
+              </div>
+              <Icon name={isExp ? 'chevDown' : 'chevRight'} size={15} color="var(--fg-subtle)" />
+            </div>
+            {isExp && (
+              <div style={{ borderTop:'1px solid var(--border-subtle)', animation:'fadeUp 180ms var(--ease-out) both' }}>
+                {blocking.length > 0 && (
+                  <>
+                    <div style={{ padding:'8px 18px', background:'rgba(192,57,43,0.04)',
+                      borderBottom:'1px solid var(--border-subtle)', fontSize:10, fontWeight:700,
+                      letterSpacing:'0.10em', textTransform:'uppercase', color:'#922B21',
+                      display:'flex', alignItems:'center', gap:6 }}>
+                      <Icon name="alert" size={12} color="currentColor" />
+                      Causing blocks ({blocking.length})
+                    </div>
+                    <DepTable deps={blocking} ownerMode={ownerMode} density={density} onEdit={onEdit} onDelete={onDelete} onView={onView} />
+                  </>
+                )}
+                {blocked.length > 0 && (
+                  <>
+                    <div style={{ padding:'8px 18px', background:'rgba(68,163,186,0.05)',
+                      borderBottom:'1px solid var(--border-subtle)',
+                      borderTop: blocking.length > 0 ? '1px solid var(--border-subtle)' : 'none',
+                      fontSize:10, fontWeight:700, letterSpacing:'0.10em',
+                      textTransform:'uppercase', color:'#1F6E82',
+                      display:'flex', alignItems:'center', gap:6 }}>
+                      <Icon name="link" size={12} color="currentColor" />
+                      Being blocked ({blocked.length})
+                    </div>
+                    <DepTable deps={blocked} ownerMode={ownerMode} density={density} onEdit={onEdit} onDelete={onDelete} onView={onView} />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── DETAIL DRAWER ─────────────────────────────────────────────
+function DepDetail({ dep, ownerMode, onClose, onEdit, onDelete }) {
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const overdue = isOverdue(dep);
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(36,45,49,0.38)',
+      display:'flex', justifyContent:'flex-end', zIndex:900 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ width:460, background:'#fff', height:'100%', overflowY:'auto',
+        boxShadow:'var(--shadow-lg)', animation:'slideInRight 220ms var(--ease-out) both',
+        display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'18px 24px', borderBottom:'1px solid var(--border-subtle)',
+          display:'flex', alignItems:'flex-start', gap:12 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+              <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'var(--fg-subtle)' }}>{dep.id}</span>
+              <PhaseBadge phase={dep.phase} />
+              <PriorityBadge priority={dep.priority} />
+              <StatusBadge status={dep.status} />
+            </div>
+            <div style={{ fontFamily:'Manrope', fontWeight:700, fontSize:15, lineHeight:1.3 }}>
+              {dep.blockedTask}
+            </div>
+          </div>
+          <button className="btn-ic" onClick={onClose} style={{ color:'var(--fg-subtle)', marginTop:2 }}>
+            <Icon name="x" size={18} color="currentColor" />
+          </button>
+        </div>
+        <div style={{ padding:'22px 24px', display:'flex', flexDirection:'column', gap:20, flex:1 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+                color:'var(--fg-subtle)', marginBottom:6 }}>Blocked Team</div>
+              <div style={{ fontWeight:600 }}>{dep.blockedTeam}</div>
+            </div>
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+                color:'var(--fg-subtle)', marginBottom:6 }}>Blocking Team</div>
+              <div style={{ fontWeight:600 }}>{dep.blockingTeam}</div>
+            </div>
+          </div>
+          <div style={{ padding:'14px 16px', background:'var(--bg-page)', borderLeft:'3px solid var(--border-default)' }}>
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+              color:'var(--fg-subtle)', marginBottom:6 }}>Blocking Task</div>
+            <div style={{ lineHeight:1.5 }}>{dep.blockingTask}</div>
+          </div>
+          <div>
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+              color:'var(--fg-subtle)', marginBottom:6 }}>Due Date</div>
+            <div style={{ display:'inline-flex', alignItems:'center', gap:6,
+              color: overdue ? 'var(--secil-red)' : 'var(--fg-default)',
+              fontFamily:'JetBrains Mono', fontSize:13 }}>
+              {overdue && <Icon name="alert" size={13} color="var(--secil-red)" />}
+              {fmtDate(dep.dueDate)}
+              {overdue && <span style={{ fontSize:10, fontFamily:'Inter', fontWeight:600 }}>OVERDUE</span>}
+            </div>
+          </div>
+          {dep.notes && (
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+                color:'var(--fg-subtle)', marginBottom:8 }}>Notes</div>
+              <div style={{ fontSize:13, lineHeight:1.65, color:'var(--fg-muted)' }}>{dep.notes}</div>
+            </div>
+          )}
+        </div>
+        {ownerMode && (
+          <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border-subtle)', display:'flex', gap:10 }}>
+            <button onClick={() => onEdit(dep)} style={{
+              flex:1, padding:'8px', border:'1px solid var(--border-default)',
+              background:'#fff', color:'var(--fg-default)', fontFamily:'Inter', fontWeight:600,
+              fontSize:13, cursor:'pointer', borderRadius:2, display:'flex', alignItems:'center',
+              justifyContent:'center', gap:6 }}>
+              <Icon name="edit" size={14} /> Edit
+            </button>
+            <button onClick={() => { if(window.confirm('Delete this dependency?')) { onDelete(dep.id); onClose(); }}} style={{
+              padding:'8px 14px', border:'1px solid var(--border-default)',
+              background:'#fff', color:'var(--secil-red)', fontFamily:'Inter', fontWeight:600,
+              fontSize:13, cursor:'pointer', borderRadius:2, display:'flex', alignItems:'center', gap:6 }}>
+              <Icon name="trash" size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function DepModal({ dep, onClose, onSave }) {
+  const isNew = !dep.id;
+  const [form, setForm] = useState({
+    id:           dep.id           || '',
+    blockedTask:  dep.blockedTask  || '',
+    blockedTeam:  dep.blockedTeam  || '',
+    blockingTask: dep.blockingTask || '',
+    blockingTeam: dep.blockingTeam || '',
+    phase:        dep.phase        || 'P1',
+    priority:     dep.priority     || 'Medium',
+    status:       dep.status       || 'Open',
+    dueDate:      dep.dueDate      || '',
+    notes:        dep.notes        || '',
   });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const valid = form.blockedTask.trim() && form.blockingTask.trim() && form.blockedTeam.trim() && form.blockingTeam.trim();
+
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(36,45,49,0.45)',
+      display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:'#fff', width:'100%', maxWidth:640, maxHeight:'90vh',
+        overflowY:'auto', boxShadow:'var(--shadow-lg)', animation:'fadeUp 200ms var(--ease-out) both' }}>
+        <div style={{ padding:'18px 24px', borderBottom:'1px solid var(--border-subtle)',
+          display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ fontFamily:'Manrope', fontWeight:800, fontSize:16 }}>
+            {isNew ? 'Add Dependency' : `Edit ${dep.id}`}
+          </div>
+          <button className="btn-ic" onClick={onClose} style={{ color:'var(--fg-subtle)' }}>
+            <Icon name="x" size={18} color="currentColor" />
+          </button>
+        </div>
+        <div style={{ padding:'24px', display:'flex', flexDirection:'column', gap:18 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 180px', gap:14 }}>
+            <div className="ff">
+              <label>Blocked Task *</label>
+              <input value={form.blockedTask} onChange={e => set('blockedTask', e.target.value)} placeholder="Task waiting on the blocker…" />
+            </div>
+            <div className="ff">
+              <label>Blocked Team *</label>
+              <input value={form.blockedTeam} onChange={e => set('blockedTeam', e.target.value)} placeholder="Team / Dept" />
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 180px', gap:14 }}>
+            <div className="ff">
+              <label>Blocking Task *</label>
+              <input value={form.blockingTask} onChange={e => set('blockingTask', e.target.value)} placeholder="Task that must happen first…" />
+            </div>
+            <div className="ff">
+              <label>Blocking Team *</label>
+              <input value={form.blockingTeam} onChange={e => set('blockingTeam', e.target.value)} placeholder="Team / Dept" />
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:14 }}>
+            <div className="ff">
+              <label>Phase</label>
+              <select value={form.phase} onChange={e => set('phase', e.target.value)}>
+                {PHASES.map(p => <option key={p.id} value={p.id}>{p.id} — {p.short}</option>)}
+              </select>
+            </div>
+            <div className="ff">
+              <label>Priority</label>
+              <select value={form.priority} onChange={e => set('priority', e.target.value)}>
+                {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="ff">
+              <label>Status</label>
+              <select value={form.status} onChange={e => set('status', e.target.value)}>
+                {STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="ff">
+              <label>Due Date</label>
+              <input type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
+            </div>
+          </div>
+          <div className="ff">
+            <label>Notes</label>
+            <textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Context, links, decisions…" />
+          </div>
+        </div>
+        <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border-subtle)',
+          display:'flex', justifyContent:'flex-end', gap:10 }}>
+          <button onClick={onClose} style={{ padding:'8px 18px', border:'1px solid var(--border-default)',
+            background:'#fff', color:'var(--fg-default)', borderRadius:2, fontFamily:'Inter',
+            fontWeight:600, fontSize:13, cursor:'pointer' }}>Cancel</button>
+          <button onClick={() => valid && onSave(form)} disabled={!valid} style={{
+            padding:'8px 20px', border:'1px solid transparent',
+            background: valid ? 'var(--secil-yellow)' : 'var(--neutral-200)',
+            color: valid ? 'var(--secil-charcoal)' : 'var(--fg-disabled)',
+            borderRadius:2, fontFamily:'Inter', fontWeight:700, fontSize:13,
+            cursor: valid ? 'pointer' : 'not-allowed' }}>
+            {isNew ? 'Add Dependency' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ── TOAST ─────────────────────────────────────────────────────
+function Toast({ msg, onHide }) {
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(onHide, 2600);
+    return () => clearTimeout(t);
+  }, [msg, onHide]);
+  return (
+    <div style={{ position:'fixed', bottom:24, right:24, background:'var(--secil-charcoal)',
+      color:'#fff', padding:'11px 18px', fontSize:13, fontWeight:500,
+      borderLeft:'3px solid var(--secil-yellow)', boxShadow:'var(--shadow-md)',
+      opacity: msg ? 1 : 0, transform: msg ? 'none' : 'translateY(6px)',
+      transition:'opacity 200ms, transform 200ms', pointerEvents:'none', zIndex:2000 }}>
+      {msg}
+    </div>
+  );
 }
 
-function sortBy(col) {
-  if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = 1; }
-  render();
+// ── SIDEBAR ───────────────────────────────────────────────────
+function Sidebar({ view, onView }) {
+  const items = [
+    { id:'all',   icon:'list',  label:'All Dependencies' },
+    { id:'phase', icon:'grid',  label:'By Phase' },
+    { id:'team',  icon:'users', label:'By Team' },
+  ];
+  return (
+    <aside style={{ width:232, flexShrink:0, background:'var(--secil-charcoal)', color:'#fff',
+      padding:'22px 16px', display:'flex', flexDirection:'column', gap:28,
+      height:'100vh', position:'sticky', top:0, overflow:'hidden' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, paddingBottom:18,
+        borderBottom:'1px solid rgba(255,255,255,0.10)' }}>
+        <div style={{ width:32, height:32, background:'var(--secil-yellow)', flexShrink:0,
+          display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ fontFamily:'Manrope', fontWeight:800, fontSize:16,
+            color:'var(--secil-charcoal)', lineHeight:1 }}>S</span>
+        </div>
+        <div>
+          <div style={{ fontFamily:'Manrope', fontWeight:800, fontSize:12,
+            letterSpacing:'0.14em', textTransform:'uppercase' }}>SECIL</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.48)', marginTop:1 }}>
+            Q2D · Dependencies
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+        <div style={{ fontSize:9, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase',
+          color:'rgba(255,255,255,0.35)', marginBottom:6, paddingLeft:12 }}>Views</div>
+        {items.map(item => {
+          const active = view === item.id;
+          return (
+            <button key={item.id} onClick={() => onView(item.id)} style={{
+              display:'flex', alignItems:'center', gap:10, padding:'8px 12px',
+              background: active ? 'rgba(252,184,9,0.10)' : 'transparent',
+              border:'none', borderLeft:`2px solid ${active ? 'var(--secil-yellow)' : 'transparent'}`,
+              color: active ? 'var(--secil-yellow)' : 'rgba(255,255,255,0.72)',
+              fontSize:13, fontFamily:'Inter', cursor:'pointer',
+              transition:'background 120ms, color 120ms', textAlign:'left', width:'100%' }}>
+              <Icon name={item.icon} size={15} color="currentColor" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop:'auto', paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.10)',
+        fontSize:10, color:'rgba(255,255,255,0.35)', lineHeight:1.65 }}>
+        Q2D Project · Secil<br />{fmtDate(TODAY)}
+      </div>
+    </aside>
+  );
 }
 
-function quickFilterPhase(ph) {
-  document.getElementById('fPhase').value = ph;
-  render();
-}
-
-// --- Modal ---
-function openModal(id) {
-  editId = id || null;
-  const d = id ? deps.find(x => x.id === id) : null;
-  document.getElementById('modalTitle').textContent = d ? 'Edit Dependency' : 'Add Dependency';
-  document.getElementById('f_phase').value         = d?.phase         || 'Phase 1';
-  document.getElementById('f_blocked_task').value  = d?.blocked_task  || '';
-  document.getElementById('f_blocked_team').value  = d?.blocked_team  || '';
-  document.getElementById('f_blocking_task').value = d?.blocking_task || '';
-  document.getElementById('f_blocking_team').value = d?.blocking_team || '';
-  document.getElementById('f_priority').value      = d?.priority      || 'Medium';
-  document.getElementById('f_status').value        = d?.status        || 'Open';
-  document.getElementById('f_due_date').value      = d?.due_date      || '';
-  document.getElementById('f_notes').value         = d?.notes         || '';
-  document.getElementById('overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f_blocked_task').focus(), 50);
-}
-
-function closeModal() {
-  document.getElementById('overlay').classList.remove('open');
-  editId = null;
-}
-
-function overlayClick(e) {
-  if (e.target === document.getElementById('overlay')) closeModal();
-}
-
-function save() {
-  const vals = {
-    phase:         document.getElementById('f_phase').value,
-    blocked_task:  document.getElementById('f_blocked_task').value.trim(),
-    blocked_team:  document.getElementById('f_blocked_team').value.trim(),
-    blocking_task: document.getElementById('f_blocking_task').value.trim(),
-    blocking_team: document.getElementById('f_blocking_team').value.trim(),
-    priority:      document.getElementById('f_priority').value,
-    status:        document.getElementById('f_status').value,
-    due_date:      document.getElementById('f_due_date').value,
-    notes:         document.getElementById('f_notes').value.trim(),
+// ── TOPBAR ────────────────────────────────────────────────────
+function TopBar({ filters, onFilter, ownerMode, onAdd, onExport, onImport }) {
+  const fileRef = useRef();
+  const selStyle = {
+    fontFamily:'Inter', fontSize:13, padding:'7px 10px', border:'1px solid var(--border-default)',
+    borderRadius:2, background:'#fff', cursor:'pointer', outline:'none', color:'var(--fg-default)'
   };
-
-  if (!vals.blocked_task || !vals.blocked_team || !vals.blocking_task || !vals.blocking_team) {
-    alert('Please fill in all required fields (marked with *).');
-    return;
-  }
-
-  const now = new Date().toISOString();
-  if (editId) {
-    const i = deps.findIndex(d => d.id === editId);
-    deps[i] = { ...deps[i], ...vals, updated_at: now };
-  } else {
-    deps.push({ id: crypto.randomUUID(), ...vals, created_at: now, updated_at: now });
-  }
-
-  closeModal();
-  render();
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+      padding:'12px 24px', borderBottom:'1px solid var(--border-subtle)',
+      background:'#fff', gap:14, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <div style={{ position:'relative' }}>
+          <Icon name="search" size={14} color="var(--fg-subtle)"
+            style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
+          <input value={filters.search} onChange={e => onFilter('search', e.target.value)}
+            placeholder="Search tasks, teams…"
+            style={{ ...selStyle, paddingLeft:30, width:210 }}
+            onFocus={e => { e.target.style.borderColor='var(--secil-yellow)'; e.target.style.boxShadow='var(--shadow-focus)'; }}
+            onBlur={e => { e.target.style.borderColor='var(--border-default)'; e.target.style.boxShadow='none'; }} />
+        </div>
+        <select value={filters.phase} onChange={e => onFilter('phase', e.target.value)} style={selStyle}>
+          <option value="">All Phases</option>
+          {PHASES.map(p => <option key={p.id} value={p.id}>{p.id} — {p.short}</option>)}
+        </select>
+        <select value={filters.status} onChange={e => onFilter('status', e.target.value)} style={selStyle}>
+          <option value="">All Statuses</option>
+          {STATUSES.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select value={filters.priority} onChange={e => onFilter('priority', e.target.value)} style={selStyle}>
+          <option value="">All Priorities</option>
+          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+        <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer',
+          userSelect:'none', color:'var(--fg-muted)', fontWeight:500, whiteSpace:'nowrap' }}>
+          <input type="checkbox" checked={filters.hideResolved}
+            onChange={e => onFilter('hideResolved', e.target.checked)}
+            style={{ width:13, height:13, cursor:'pointer', accentColor:'var(--secil-yellow)' }} />
+          Hide resolved
+        </label>
+      </div>
+      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <input ref={fileRef} type="file" accept=".json" style={{ display:'none' }} onChange={onImport} />
+        {[
+          { label:'Import JSON', icon:'upload', action: () => fileRef.current.click() },
+          { label:'Export JSON', icon:'download', action: onExport },
+        ].map(({ label, icon, action }) => (
+          <button key={label} onClick={action} style={{
+            display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px',
+            border:'1px solid var(--border-default)', background:'#fff',
+            color:'var(--fg-default)', borderRadius:2, fontFamily:'Inter',
+            fontWeight:600, fontSize:13, cursor:'pointer', transition:'background 120ms, border-color 120ms' }}
+            onMouseEnter={e => { e.currentTarget.style.background='var(--bg-muted)'; e.currentTarget.style.borderColor='var(--secil-charcoal)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background='#fff'; e.currentTarget.style.borderColor='var(--border-default)'; }}>
+            <Icon name={icon} size={14} />{label}
+          </button>
+        ))}
+        {ownerMode && (
+          <button onClick={onAdd} style={{
+            display:'inline-flex', alignItems:'center', gap:6, padding:'7px 16px',
+            border:'none', background:'var(--secil-yellow)', color:'var(--secil-charcoal)',
+            borderRadius:2, fontFamily:'Inter', fontWeight:700, fontSize:13, cursor:'pointer',
+            transition:'background 120ms' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--yellow-500)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--secil-yellow)'}>
+            <Icon name="plus" size={14} />Add
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function del(id) {
-  if (!confirm('Delete this dependency? This cannot be undone.')) return;
-  deps = deps.filter(d => d.id !== id);
-  render();
-}
+// ── APP ───────────────────────────────────────────────────────
+function App() {
+  const [deps, setDeps]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView]       = useState('all');
+  const [filters, setFilters] = useState({ search:'', phase:'', status:'', priority:'', hideResolved:false });
+  const [modal,   setModal]   = useState(null);
+  const [detail,  setDetail]  = useState(null);
+  const [toast,   setToast]   = useState('');
+  const [ownerMode, setOwnerMode]   = useState(true);
+  const [density,   setDensity]     = useState('comfortable');
+  const [tweaksOpen, setTweaksOpen] = useState(false);
 
-// --- Import / Export ---
-function exportJSON() {
-  const blob = new Blob([JSON.stringify(deps, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'dependencies.json';
-  a.click();
-}
-
-function importJSON(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      deps = JSON.parse(ev.target.result);
-      render();
-    } catch {
-      alert('Could not read file — make sure it is a valid dependencies.json.');
+  // Load from dependencies.json (GitHub Pages), fall back to localStorage
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await fetch('dependencies.json?t=' + Date.now());
+        if (r.ok) { setDeps(await r.json()); setLoading(false); return; }
+      } catch {}
+      try {
+        const s = localStorage.getItem('q2d-deps');
+        if (s) setDeps(JSON.parse(s));
+      } catch {}
+      setLoading(false);
     }
+    load();
+  }, []);
+
+  // Cache to localStorage on every change
+  useEffect(() => {
+    if (!loading) {
+      try { localStorage.setItem('q2d-deps', JSON.stringify(deps)); } catch {}
+    }
+  }, [deps, loading]);
+
+  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const showToast = msg => setToast(msg);
+
+  const filteredDeps = useMemo(() => applyFilters(deps, filters), [deps, filters]);
+  const crossDeps    = useMemo(() => applyFilters(deps, { ...filters, phase:'' }), [deps, filters]);
+
+  const handleAdd    = () => { setDetail(null); setModal({ dep:{} }); };
+  const handleEdit   = dep => { setDetail(null); setModal({ dep }); };
+  const handleView   = dep => setDetail(dep);
+
+  const handleDelete = id => {
+    if (!window.confirm('Delete this dependency?')) return;
+    setDeps(d => d.filter(x => x.id !== id));
+    showToast('Dependency deleted.');
   };
-  reader.readAsText(file);
-  e.target.value = '';
+
+  const handleSave = form => {
+    const isNew = !form.id;
+    const saved = { ...form, id: form.id || nextId(deps) };
+    setDeps(d => isNew ? [...d, saved] : d.map(x => x.id === saved.id ? saved : x));
+    showToast(isNew ? `${saved.id} added.` : `${saved.id} updated.`);
+    setModal(null);
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(deps, null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `dependencies.json`;
+    a.click();
+    showToast('JSON exported — commit this file to publish changes.');
+  };
+
+  const handleImport = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const data = JSON.parse(evt.target.result);
+        if (!Array.isArray(data)) throw new Error();
+        setDeps(data);
+        showToast(`Imported ${data.length} dependencies.`);
+      } catch { showToast('Error: invalid JSON file.'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const kpis = [
+    { label:'Open',           v: deps.filter(d => d.status !== 'Resolved').length,                            c:'var(--fg-default)' },
+    { label:'Critical (open)',v: deps.filter(d => d.priority === 'Critical' && d.status !== 'Resolved').length, c:'var(--secil-red)' },
+    { label:'Overdue',        v: deps.filter(d => isOverdue(d)).length,                                        c:'var(--secil-red)' },
+    { label:'Resolved',       v: deps.filter(d => d.status === 'Resolved').length,                             c:'var(--secil-green)' },
+    { label:'Total',          v: deps.length,                                                                   c:'var(--fg-muted)' },
+  ];
+
+  const viewLabel = { all:'All Dependencies', phase:'By Phase', team:'By Team' }[view];
+
+  if (loading) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh',
+        fontFamily:'Manrope', fontSize:14, color:'var(--fg-subtle)' }}>
+        Loading…
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display:'flex', minHeight:'100vh' }}>
+      <Sidebar view={view} onView={setView} />
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+        {/* KPI strip */}
+        <div style={{ display:'flex', borderBottom:'1px solid var(--border-subtle)', background:'#fff', flexShrink:0 }}>
+          {kpis.map(kpi => (
+            <div key={kpi.label} style={{ padding:'10px 22px', borderRight:'1px solid var(--border-subtle)',
+              display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
+              <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.12em',
+                textTransform:'uppercase', color:'var(--fg-subtle)' }}>{kpi.label}</span>
+              <span style={{ fontFamily:'Manrope', fontWeight:800, fontSize:22, lineHeight:1,
+                letterSpacing:'-0.02em', color:kpi.c, fontVariantNumeric:'tabular-nums' }}>{kpi.v}</span>
+            </div>
+          ))}
+          <div style={{ marginLeft:'auto', padding:'10px 22px', display:'flex', alignItems:'center', gap:12 }}>
+            <span style={{ fontFamily:'Manrope', fontWeight:700, fontSize:13,
+              color:'var(--fg-default)', letterSpacing:'-0.01em' }}>{viewLabel}</span>
+            {filteredDeps.length !== deps.length && (
+              <span style={{ fontSize:11, color:'var(--fg-subtle)' }}>· showing {filteredDeps.length}</span>
+            )}
+            <button onClick={() => setTweaksOpen(t => !t)} style={{
+              display:'inline-flex', alignItems:'center', gap:5, padding:'5px 10px',
+              border:'1px solid var(--border-default)', background:'#fff', borderRadius:2,
+              fontSize:11, fontFamily:'Inter', fontWeight:600, cursor:'pointer', color:'var(--fg-muted)' }}>
+              ⚙ Tweaks
+            </button>
+          </div>
+        </div>
+
+        <TopBar filters={filters} onFilter={setFilter} ownerMode={ownerMode}
+          onAdd={handleAdd} onExport={handleExport} onImport={handleImport} />
+
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {view === 'all' && (
+            <DepTable deps={filteredDeps} ownerMode={ownerMode} density={density}
+              onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+          )}
+          {view === 'phase' && (
+            <ByPhaseView deps={crossDeps} allDeps={deps} ownerMode={ownerMode} density={density}
+              onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+          )}
+          {view === 'team' && (
+            <ByTeamView deps={crossDeps} allDeps={deps} ownerMode={ownerMode} density={density}
+              onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+          )}
+        </div>
+      </div>
+
+      {detail && (
+        <DepDetail dep={detail} ownerMode={ownerMode}
+          onClose={() => setDetail(null)}
+          onEdit={dep => { setDetail(null); handleEdit(dep); }}
+          onDelete={id => { handleDelete(id); setDetail(null); }} />
+      )}
+      {modal && <DepModal dep={modal.dep} onClose={() => setModal(null)} onSave={handleSave} />}
+      <Toast msg={toast} onHide={() => setToast('')} />
+
+      {tweaksOpen && (
+        <div style={{ position:'fixed', bottom:24, right:24, width:268,
+          background:'#fff', border:'1px solid var(--border-default)',
+          boxShadow:'var(--shadow-lg)', zIndex:500, animation:'fadeUp 180ms var(--ease-out) both' }}>
+          <div style={{ padding:'13px 16px', borderBottom:'1px solid var(--border-subtle)',
+            display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontFamily:'Manrope', fontWeight:700, fontSize:13 }}>Tweaks</span>
+            <button className="btn-ic" onClick={() => setTweaksOpen(false)} style={{ color:'var(--fg-subtle)' }}>
+              <Icon name="x" size={16} color="currentColor" />
+            </button>
+          </div>
+          <div style={{ padding:'16px', display:'flex', flexDirection:'column', gap:16 }}>
+            <label style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', gap:12 }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600 }}>Owner mode</div>
+                <div style={{ fontSize:11, color:'var(--fg-subtle)', marginTop:2 }}>Show add / edit / delete controls</div>
+              </div>
+              <input type="checkbox" checked={ownerMode} onChange={e => setOwnerMode(e.target.checked)}
+                style={{ width:15, height:15, cursor:'pointer', accentColor:'var(--secil-yellow)', flexShrink:0 }} />
+            </label>
+            <div style={{ height:1, background:'var(--border-subtle)' }} />
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+                color:'var(--fg-muted)', marginBottom:8 }}>Row density</div>
+              <div style={{ display:'flex', gap:0, border:'1px solid var(--border-default)', borderRadius:2, overflow:'hidden' }}>
+                {['comfortable','compact'].map(d => (
+                  <button key={d} onClick={() => setDensity(d)} style={{
+                    flex:1, padding:'6px', border:'none', fontFamily:'Inter', fontSize:12,
+                    fontWeight:600, cursor:'pointer', textTransform:'capitalize',
+                    background: density === d ? 'var(--secil-charcoal)' : '#fff',
+                    color: density === d ? '#fff' : 'var(--fg-muted)',
+                    transition:'background 120ms' }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+const extraStyles = document.createElement('style');
+extraStyles.textContent = `@keyframes slideInRight{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}`;
+document.head.appendChild(extraStyles);
 
-init();
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
