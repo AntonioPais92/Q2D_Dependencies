@@ -883,7 +883,7 @@ function App() {
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
       <Sidebar view={view} onView={setView} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, width:0, overflow:'hidden' }}>
         {/* KPI strip */}
         <div style={{ display:'flex', borderBottom:'1px solid var(--border-subtle)', background:'#fff', flexShrink:0 }}>
           {kpis.map(kpi => (
@@ -913,7 +913,7 @@ function App() {
         <TopBar filters={filters} onFilter={setFilter} ownerMode={ownerMode}
           onAdd={handleAdd} onExport={handleExport} onImport={handleImport} />
 
-        <div style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+        <div style={{ flex:1, overflow:'auto', minHeight:0 }}>
           {view === 'all' && (
             <DepTable deps={filteredDeps} ownerMode={ownerMode} density={density}
               onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
