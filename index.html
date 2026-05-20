@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{margin:0;padding:0;overflow:hidden}
@@ -90,6 +91,7 @@ const ICONS = {
   alert:     ['M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z','M12 9v4','M12 17h.01'],
   check:     ['M20 6L9 17l-5-5'],
   link:      ['M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71','M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71'],
+  share2:    ['M15 5a3 3 0 1,0 6,0a3 3 0 1,0-6,0','M3 12a3 3 0 1,0 6,0a3 3 0 1,0-6,0','M15 19a3 3 0 1,0 6,0a3 3 0 1,0-6,0','M8.59 13.51l6.83 3.98','M15.41 6.51l-6.82 3.98'],
 };
 function Icon({ name, size=16, color='currentColor', style={} }) {
   const paths = ICONS[name] || [];
@@ -431,6 +433,328 @@ function ByTeamView({ deps, allDeps, ownerMode, density, onEdit, onDelete, onVie
   );
 }
 
+// ── DEP CARD (network side panel) ────────────────────────────
+function DepCard({ dep, ownerMode, onEdit, onDelete }) {
+  const overdue = isOverdue(dep);
+  return (
+    <div style={{ padding:'12px 18px', borderBottom:'1px solid var(--border-subtle)' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', gap:6, marginBottom:5, flexWrap:'wrap', alignItems:'center' }}>
+            <span style={{ fontFamily:'JetBrains Mono', fontSize:10, color:'var(--fg-subtle)' }}>{dep.id}</span>
+            <PhaseBadge phase={dep.phase} />
+            <PriorityBadge priority={dep.priority} />
+          </div>
+          <div style={{ fontSize:12, fontWeight:600, marginBottom:3, lineHeight:1.35 }}>{dep.blockedTask}</div>
+          <div style={{ fontSize:11, color:'var(--fg-subtle)', marginBottom:6, lineHeight:1.3 }}>
+            ← {dep.blockingTask}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <StatusBadge status={dep.status} />
+            {dep.dueDate && (
+              <span style={{ fontFamily:'JetBrains Mono', fontSize:10,
+                color: overdue ? 'var(--secil-red)' : 'var(--fg-subtle)',
+                display:'inline-flex', alignItems:'center', gap:4 }}>
+                {overdue && <Icon name="alert" size={10} color="var(--secil-red)" />}
+                {fmtDate(dep.dueDate)}
+              </span>
+            )}
+          </div>
+        </div>
+        {ownerMode && (
+          <div style={{ display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
+            <button className="btn-ic" title="Edit" onClick={() => onEdit(dep)}
+              style={{ color:'var(--fg-subtle)' }}
+              onMouseEnter={e => e.currentTarget.style.color='var(--fg-default)'}
+              onMouseLeave={e => e.currentTarget.style.color='var(--fg-subtle)'}>
+              <Icon name="edit" size={13} color="currentColor" />
+            </button>
+            <button className="btn-ic" title="Delete"
+              onClick={() => { if(window.confirm('Delete this dependency?')) onDelete(dep.id); }}
+              style={{ color:'var(--fg-subtle)' }}
+              onMouseEnter={e => e.currentTarget.style.color='var(--secil-red)'}
+              onMouseLeave={e => e.currentTarget.style.color='var(--fg-subtle)'}>
+              <Icon name="trash" size={13} color="currentColor" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── NETWORK VIEW ──────────────────────────────────────────────
+function NetworkView({ deps, ownerMode, onEdit, onDelete, onAdd }) {
+  const containerRef = useRef();
+  const networkRef   = useRef(null);
+  const [mode,     setMode]     = useState('teams');
+  const [selected, setSelected] = useState(null);
+
+  const priColors = { Critical:'#C0392B', High:'#FC9053', Medium:'#44A3BA', Low:'#9A9685' };
+  const priWidth  = { Critical:4, High:3, Medium:2, Low:1.5 };
+
+  const { nodes, edges } = useMemo(() => {
+    if (mode === 'teams') {
+      const nodeMap = new Map();
+      const edgeMap = new Map();
+      deps.forEach(d => {
+        [d.blockingTeam, d.blockedTeam].forEach(t => {
+          if (!nodeMap.has(t)) nodeMap.set(t, { id:t, label:t, count:0 });
+          nodeMap.get(t).count++;
+        });
+        if (d.blockingTeam !== d.blockedTeam) {
+          const eid = `${d.blockingTeam}||${d.blockedTeam}`;
+          if (!edgeMap.has(eid)) edgeMap.set(eid, { from:d.blockingTeam, to:d.blockedTeam, count:0, worst:'Low' });
+          const e = edgeMap.get(eid); e.count++;
+          const ord = { Critical:0,High:1,Medium:2,Low:3 };
+          if ((ord[d.priority]??3) < (ord[e.worst]??3)) e.worst = d.priority;
+        }
+      });
+      return {
+        nodes: [...nodeMap.values()].map(n => ({
+          id:n.id, label:n.label,
+          size: 14 + Math.min(n.count * 2, 18),
+          shape:'dot',
+          color:{ background:'#323F45', border:'#FCB809', highlight:{ background:'#FCB809', border:'#C99206' } },
+          font:{ color:'#242D31', size:12, face:'Inter', background:'rgba(255,255,255,0.90)', strokeWidth:3, strokeColor:'rgba(255,255,255,0.90)' },
+        })),
+        edges: [...edgeMap.values()].map(e => ({
+          from:e.from, to:e.to, label:String(e.count),
+          color:{ color:priColors[e.worst], highlight:priColors[e.worst] },
+          width:priWidth[e.worst],
+          arrows:{ to:{ enabled:true, scaleFactor:0.7 } },
+          font:{ size:10, color:'#4D4A40', face:'JetBrains Mono', align:'middle' },
+          smooth:{ type:'continuous' },
+        })),
+      };
+    } else {
+      const nodeMap = new Map();
+      const addNode = (task, team, phase) => {
+        if (nodeMap.has(task)) return;
+        const idx = PHASES.findIndex(p => p.id === phase);
+        const c   = PHASE_COLORS[idx] || '#9A9685';
+        nodeMap.set(task, {
+          id:task,
+          label: task.length > 28 ? task.slice(0,26)+'…' : task,
+          title: `${task}\n${team} · ${phase}`,
+          color:{ background:c+'28', border:c, highlight:{ background:c+'55', border:c } },
+          font:{ color:'#242D31', size:11, face:'Inter' },
+          shape:'box', margin:8,
+        });
+      };
+      deps.forEach(d => { addNode(d.blockingTask, d.blockingTeam, d.phase); addNode(d.blockedTask, d.blockedTeam, d.phase); });
+      return {
+        nodes: [...nodeMap.values()],
+        edges: deps.map((d,i) => ({
+          id:`e${i}`, from:d.blockingTask, to:d.blockedTask,
+          color:{ color:priColors[d.priority], highlight:priColors[d.priority] },
+          width:priWidth[d.priority],
+          arrows:{ to:{ enabled:true, scaleFactor:0.7 } },
+          title:`${d.id} · ${d.priority} · ${d.status}`,
+          smooth:{ type:'curvedCW', roundness:0.2 },
+        })),
+      };
+    }
+  }, [deps, mode]);
+
+  useEffect(() => {
+    if (!containerRef.current || typeof vis === 'undefined') return;
+    if (networkRef.current) { networkRef.current.destroy(); networkRef.current = null; }
+    if (nodes.length === 0) return;
+
+    const baseOpts = {
+      interaction:{ hover:true, tooltipDelay:180 },
+      nodes:{ borderWidth:1.5 },
+      edges:{ selectionWidth:2 },
+    };
+    const layoutOpts = mode === 'teams'
+      ? { physics:{ enabled:true, barnesHut:{ gravitationalConstant:-5000, centralGravity:0.35, springLength:150, springConstant:0.05, avoidOverlap:0.7 }, stabilization:{ iterations:200 } }, layout:{ improvedLayout:true } }
+      : { physics:{ enabled:false }, layout:{ hierarchical:{ enabled:true, direction:'LR', sortMethod:'directed', nodeSpacing:80, levelSeparation:260, treeSpacing:100 } } };
+
+    const network = new vis.Network(
+      containerRef.current,
+      { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
+      { ...baseOpts, ...layoutOpts }
+    );
+    network.on('click', params => {
+      if (params.nodes.length > 0) setSelected({ id:params.nodes[0], type: mode === 'teams' ? 'team' : 'task' });
+      else setSelected(null);
+    });
+    networkRef.current = network;
+    return () => { if (networkRef.current) { networkRef.current.destroy(); networkRef.current = null; } };
+  }, [nodes, edges, mode]);
+
+  const panelDeps = useMemo(() => {
+    if (!selected) return { causing:[], being:[] };
+    if (selected.type === 'team') return {
+      causing: deps.filter(d => d.blockingTeam === selected.id),
+      being:   deps.filter(d => d.blockedTeam  === selected.id),
+    };
+    return {
+      causing: deps.filter(d => d.blockingTask === selected.id),
+      being:   deps.filter(d => d.blockedTask  === selected.id),
+    };
+  }, [selected, deps]);
+
+  const ctrlBtn = (onClick, children) => (
+    <button onClick={onClick} style={{
+      display:'inline-flex', alignItems:'center', justifyContent:'center',
+      width:32, height:32, border:'1px solid var(--border-default)',
+      background:'rgba(255,255,255,0.92)', borderRadius:2, cursor:'pointer',
+      fontSize:15, color:'var(--fg-default)', fontFamily:'Manrope', fontWeight:700,
+      transition:'background 120ms', boxShadow:'var(--shadow-xs)' }}
+      onMouseEnter={e => e.currentTarget.style.background='var(--bg-muted)'}
+      onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.92)'}>
+      {children}
+    </button>
+  );
+
+  return (
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+      {/* Canvas */}
+      <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
+
+        {/* Mode toggle */}
+        <div style={{ position:'absolute', top:16, left:16, zIndex:10,
+          display:'inline-flex', background:'#fff', border:'1px solid var(--border-default)',
+          borderRadius:2, overflow:'hidden', boxShadow:'var(--shadow-sm)' }}>
+          {[{id:'teams',label:'Teams'},{id:'tasks',label:'Tasks'}].map(m => (
+            <button key={m.id} onClick={() => { setMode(m.id); setSelected(null); }} style={{
+              padding:'7px 18px', border:'none', fontFamily:'Manrope', fontWeight:700, fontSize:12,
+              cursor:'pointer', transition:'background 120ms, color 120ms', letterSpacing:'0.03em',
+              background: mode===m.id ? 'var(--secil-charcoal)' : '#fff',
+              color: mode===m.id ? '#fff' : 'var(--fg-muted)',
+            }}>{m.label}</button>
+          ))}
+        </div>
+
+        {/* Zoom controls */}
+        <div style={{ position:'absolute', bottom:16, right:16, zIndex:10, display:'flex', flexDirection:'column', gap:4 }}>
+          {ctrlBtn(() => networkRef.current?.moveTo({ scale: networkRef.current.getScale()*1.3 }), '+')}
+          {ctrlBtn(() => networkRef.current?.moveTo({ scale: networkRef.current.getScale()*0.75 }), '−')}
+          {ctrlBtn(() => networkRef.current?.fit({ animation:{ duration:400, easingFunction:'easeInOutQuad' } }),
+            <span style={{ fontSize:10, fontFamily:'Manrope', fontWeight:700 }}>Fit</span>
+          )}
+        </div>
+
+        {/* Legend */}
+        <div style={{ position:'absolute', bottom:16, left:16, zIndex:10,
+          background:'rgba(255,255,255,0.92)', border:'1px solid var(--border-subtle)',
+          padding:'10px 14px', boxShadow:'var(--shadow-sm)', borderRadius:2 }}>
+          <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.10em', textTransform:'uppercase',
+            color:'var(--fg-subtle)', marginBottom:6 }}>Priority / Edge</div>
+          {[['Critical','#C0392B',4],['High','#FC9053',3],['Medium','#44A3BA',2],['Low','#9A9685',1.5]].map(([label,color,w]) => (
+            <div key={label} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+              <div style={{ width:22, height:Math.max(w,1.5), background:color, borderRadius:1 }} />
+              <span style={{ fontSize:10, color:'var(--fg-muted)', fontWeight:500 }}>{label}</span>
+            </div>
+          ))}
+          {mode === 'tasks' && (
+            <>
+              <div style={{ height:1, background:'var(--border-subtle)', margin:'8px 0' }} />
+              <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.10em', textTransform:'uppercase',
+                color:'var(--fg-subtle)', marginBottom:6 }}>Phase / Node</div>
+              {PHASES.map((p,i) => (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                  <div style={{ width:10, height:10, borderRadius:1, background:PHASE_COLORS[i]+'40', border:`1.5px solid ${PHASE_COLORS[i]}` }} />
+                  <span style={{ fontSize:9, color:'var(--fg-muted)', fontWeight:500 }}>{p.id}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Empty state */}
+        {deps.length === 0 && (
+          <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column',
+            alignItems:'center', justifyContent:'center', gap:10, color:'var(--fg-subtle)', pointerEvents:'none' }}>
+            <Icon name="share2" size={32} color="var(--neutral-300)" />
+            <span style={{ fontSize:14 }}>No dependencies to visualize.</span>
+            <span style={{ fontSize:12, color:'var(--neutral-400)' }}>Add dependencies from any other view.</span>
+          </div>
+        )}
+
+        <div ref={containerRef} style={{ width:'100%', height:'100%', background:'var(--bg-page)' }} />
+      </div>
+
+      {/* Side panel */}
+      {selected && (
+        <div style={{ width:340, flexShrink:0, borderLeft:'1px solid var(--border-subtle)',
+          background:'#fff', display:'flex', flexDirection:'column', overflow:'hidden',
+          animation:'slideInRight 200ms var(--ease-out) both' }}>
+          <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border-subtle)',
+            display:'flex', alignItems:'flex-start', gap:10, flexShrink:0 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.10em', textTransform:'uppercase',
+                color:'var(--fg-subtle)', marginBottom:4 }}>
+                {selected.type === 'team' ? 'Team' : 'Task'}
+              </div>
+              <div style={{ fontFamily:'Manrope', fontWeight:700, fontSize:14, lineHeight:1.3,
+                wordBreak:'break-word' }}>{selected.id}</div>
+            </div>
+            <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+              {ownerMode && (
+                <button onClick={() => {
+                  const initial = selected.type === 'team'
+                    ? { blockingTeam: selected.id }
+                    : { blockingTask: selected.id, blockingTeam: panelDeps.causing[0]?.blockingTeam || '' };
+                  onAdd(initial);
+                }} style={{
+                  display:'inline-flex', alignItems:'center', gap:5, padding:'6px 10px',
+                  border:'none', background:'var(--secil-yellow)', color:'var(--secil-charcoal)',
+                  borderRadius:2, fontFamily:'Inter', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                  <Icon name="plus" size={12} />New
+                </button>
+              )}
+              <button className="btn-ic" onClick={() => setSelected(null)} style={{ color:'var(--fg-subtle)' }}>
+                <Icon name="x" size={16} color="currentColor" />
+              </button>
+            </div>
+          </div>
+
+          <div style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+            {panelDeps.causing.length > 0 && (
+              <div>
+                <div style={{ padding:'8px 18px', background:'rgba(192,57,43,0.04)',
+                  borderBottom:'1px solid var(--border-subtle)', fontSize:10, fontWeight:700,
+                  letterSpacing:'0.10em', textTransform:'uppercase', color:'#922B21',
+                  display:'flex', alignItems:'center', gap:6 }}>
+                  <Icon name="alert" size={12} color="currentColor" />
+                  Causing Blocks ({panelDeps.causing.length})
+                </div>
+                {panelDeps.causing.map(d => (
+                  <DepCard key={d.id} dep={d} ownerMode={ownerMode} onEdit={onEdit} onDelete={onDelete} />
+                ))}
+              </div>
+            )}
+            {panelDeps.being.length > 0 && (
+              <div>
+                <div style={{ padding:'8px 18px', background:'rgba(68,163,186,0.05)',
+                  borderBottom:'1px solid var(--border-subtle)',
+                  borderTop: panelDeps.causing.length > 0 ? '1px solid var(--border-subtle)' : 'none',
+                  fontSize:10, fontWeight:700, letterSpacing:'0.10em',
+                  textTransform:'uppercase', color:'#1F6E82',
+                  display:'flex', alignItems:'center', gap:6 }}>
+                  <Icon name="link" size={12} color="currentColor" />
+                  Being Blocked ({panelDeps.being.length})
+                </div>
+                {panelDeps.being.map(d => (
+                  <DepCard key={d.id} dep={d} ownerMode={ownerMode} onEdit={onEdit} onDelete={onDelete} />
+                ))}
+              </div>
+            )}
+            {panelDeps.causing.length === 0 && panelDeps.being.length === 0 && (
+              <div style={{ padding:'40px 18px', textAlign:'center', color:'var(--fg-subtle)', fontSize:13 }}>
+                No dependencies for this {selected.type}.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── DETAIL DRAWER ─────────────────────────────────────────────
 function DepDetail({ dep, ownerMode, onClose, onEdit, onDelete }) {
   useEffect(() => {
@@ -652,9 +976,10 @@ function Toast({ msg, onHide }) {
 // ── SIDEBAR ───────────────────────────────────────────────────
 function Sidebar({ view, onView }) {
   const items = [
-    { id:'all',   icon:'list',  label:'All Dependencies' },
-    { id:'phase', icon:'grid',  label:'By Phase' },
-    { id:'team',  icon:'users', label:'By Team' },
+    { id:'all',     icon:'list',   label:'All Dependencies' },
+    { id:'phase',   icon:'grid',   label:'By Phase' },
+    { id:'team',    icon:'users',  label:'By Team' },
+    { id:'network', icon:'share2', label:'Network' },
   ];
   return (
     <aside style={{ width:232, flexShrink:0, background:'var(--secil-charcoal)', color:'#fff',
@@ -818,7 +1143,7 @@ function App() {
   const filteredDeps = useMemo(() => applyFilters(deps, filters), [deps, filters]);
   const crossDeps    = useMemo(() => applyFilters(deps, { ...filters, phase:'' }), [deps, filters]);
 
-  const handleAdd    = () => { setDetail(null); setModal({ dep:{} }); };
+  const handleAdd    = (initial = {}) => { setDetail(null); setModal({ dep: initial }); };
   const handleEdit   = dep => { setDetail(null); setModal({ dep }); };
   const handleView   = dep => setDetail(dep);
 
@@ -869,7 +1194,7 @@ function App() {
     { label:'Total',          v: deps.length,                                                                   c:'var(--fg-muted)' },
   ];
 
-  const viewLabel = { all:'All Dependencies', phase:'By Phase', team:'By Team' }[view];
+  const viewLabel = { all:'All Dependencies', phase:'By Phase', team:'By Team', network:'Network' }[view];
 
   if (loading) {
     return (
@@ -913,7 +1238,7 @@ function App() {
         <TopBar filters={filters} onFilter={setFilter} ownerMode={ownerMode}
           onAdd={handleAdd} onExport={handleExport} onImport={handleImport} />
 
-        <div style={{ flex:1, overflow:'auto', minHeight:0 }}>
+        <div style={{ flex:1, overflow: view === 'network' ? 'hidden' : 'auto', minHeight:0 }}>
           {view === 'all' && (
             <DepTable deps={filteredDeps} ownerMode={ownerMode} density={density}
               onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
@@ -926,10 +1251,14 @@ function App() {
             <ByTeamView deps={crossDeps} allDeps={deps} ownerMode={ownerMode} density={density}
               onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
           )}
+          {view === 'network' && (
+            <NetworkView deps={filteredDeps} ownerMode={ownerMode}
+              onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} />
+          )}
         </div>
       </div>
 
-      {detail && (
+      {detail && view !== 'network' && (
         <DepDetail dep={detail} ownerMode={ownerMode}
           onClose={() => setDetail(null)}
           onEdit={dep => { setDetail(null); handleEdit(dep); }}
