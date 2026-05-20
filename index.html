@@ -11,9 +11,9 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%;overflow:hidden}
 body{font-family:var(--font-body);font-size:14px;color:var(--fg-default);background:var(--bg-page);-webkit-font-smoothing:antialiased}
-#root{display:flex;min-height:100vh}
+#root{display:flex;height:100vh;overflow:hidden}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--neutral-300);border-radius:3px}
@@ -662,11 +662,8 @@ function Sidebar({ view, onView }) {
       height:'100vh', position:'sticky', top:0, overflow:'hidden' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, paddingBottom:18,
         borderBottom:'1px solid rgba(255,255,255,0.10)' }}>
-        <div style={{ width:32, height:32, background:'var(--secil-yellow)', flexShrink:0,
-          display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontFamily:'Manrope', fontWeight:800, fontSize:16,
-            color:'var(--secil-charcoal)', lineHeight:1 }}>S</span>
-        </div>
+        <img src="assets/secil-logo.png" alt="SECIL"
+          style={{ width:32, height:29, filter:'brightness(0) invert(1)', objectFit:'contain', flexShrink:0 }} />
         <div>
           <div style={{ fontFamily:'Manrope', fontWeight:800, fontSize:12,
             letterSpacing:'0.14em', textTransform:'uppercase' }}>SECIL</div>
@@ -882,9 +879,9 @@ function App() {
   }
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh' }}>
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
       <Sidebar view={view} onView={setView} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, height:'100vh', overflow:'hidden' }}>
         {/* KPI strip */}
         <div style={{ display:'flex', borderBottom:'1px solid var(--border-subtle)', background:'#fff', flexShrink:0 }}>
           {kpis.map(kpi => (
@@ -914,7 +911,7 @@ function App() {
         <TopBar filters={filters} onFilter={setFilter} ownerMode={ownerMode}
           onAdd={handleAdd} onExport={handleExport} onImport={handleImport} />
 
-        <div style={{ flex:1, overflowY:'auto' }}>
+        <div style={{ flex:1, overflowY:'auto', minHeight:0 }}>
           {view === 'all' && (
             <DepTable deps={filteredDeps} ownerMode={ownerMode} density={density}
               onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
