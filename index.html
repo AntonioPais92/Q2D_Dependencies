@@ -883,9 +883,9 @@ function App() {
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
       <Sidebar view={view} onView={setView} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, width:0, overflow:'hidden' }}>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
         {/* KPI strip */}
-        <div style={{ display:'flex', borderBottom:'1px solid var(--border-subtle)', background:'#fff', flexShrink:0 }}>
+        <div style={{ display:'flex', borderBottom:'1px solid var(--border-subtle)', background:'#fff', flexShrink:0, overflowX:'auto' }}>
           {kpis.map(kpi => (
             <div key={kpi.label} style={{ padding:'10px 22px', borderRight:'1px solid var(--border-subtle)',
               display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
